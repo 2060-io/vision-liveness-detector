@@ -96,6 +96,19 @@ std::map<std::string, std::string> parse_args(int argc, char** argv) {
     return args;
 }
 
+std::vector<std::string> split_paths(const std::string& paths, char delim = ':') {
+    std::vector<std::string> result;
+    size_t start = 0, end = 0;
+    while ((end = paths.find(delim, start)) != std::string::npos) {
+        if (end > start)
+            result.push_back(paths.substr(start, end - start));
+        start = end + 1;
+    }
+    if (!paths.substr(start).empty())
+        result.push_back(paths.substr(start));
+    return result;
+}
+
 
 int main(int argc, char** argv) {
 
@@ -116,7 +129,7 @@ int main(int argc, char** argv) {
 
     if (missing) {
         std::cerr << "Usage: " << argv[0]
-                << " --model_path <path> --gestures_folder_path <path> --language <lang>"
+                << " --model_path <path> --gestures_folder_path <path1>:<path2> --language <lang>"
                 << " --socket_path <path> --num_gestures <int> --font_path <path>\n";
         return EXIT_FAILURE;
     }
@@ -124,6 +137,7 @@ int main(int argc, char** argv) {
     // Example: retrieving arguments:
     std::string model_path = args["--model_path"];
     std::string gestures_folder_path = args["--gestures_folder_path"];
+    std::vector<std::string> gestures_folders = split_paths(gestures_folder_path);
     std::string language = args["--language"];
     std::string socket_path = args["--socket_path"];
     int num_gestures = std::stoi(args["--num_gestures"]);
@@ -139,15 +153,17 @@ int main(int argc, char** argv) {
     // Load gesture definitions from JSON files.
     std::vector<std::string> gestureFiles;
 
-    try {
-        for (const auto& entry : fs::directory_iterator(gestures_folder_path)) {
-            if (entry.path().extension() == ".json") {
-                gestureFiles.push_back(entry.path().string());
+    for (const auto& folder : gestures_folders) {
+        try {
+            for (const auto& entry : fs::directory_iterator(folder)) {
+                if (entry.path().extension() == ".json") {
+                    gestureFiles.push_back(entry.path().string());
+                }
             }
+        } catch (fs::filesystem_error& e) {
+            std::cerr << "Error accessing the gestures folder: " << folder << ": " << e.what() << "\n";
+            // Continue trying other folders (don't return yet);
         }
-    } catch (fs::filesystem_error& e) {
-        std::cerr << "Error accessing the gestures folder: " << e.what() << "\n";
-        return EXIT_FAILURE;
     }
 
     if (gestureFiles.empty()) {
