@@ -84,18 +84,50 @@ std::string verify_correct_face(
     return "";
 }
 
+std::map<std::string, std::string> parse_args(int argc, char** argv) {
+    std::map<std::string, std::string> args;
+    for (int i = 1; i < argc; i+=2) {
+        if (std::string(argv[i]).find("--") == 0) {
+            if (i + 1 < argc) {
+                args[argv[i]] = argv[i+1];
+            }
+        }
+    }
+    return args;
+}
+
+
 int main(int argc, char** argv) {
-    if (argc != 7) {
-        std::cerr << "Usage: " << argv[0] << " <model_path> <gestures_folder_path> <language> <socket_path> <num_gestures> <font_path>\n";
+
+    auto args = parse_args(argc, argv);
+
+    // List of required argument names (without leading "--" since parse_args strips it)
+    std::vector<std::string> required_keys = {
+        "model_path", "gestures_folder_path", "language", "socket_path", "num_gestures", "font_path"
+    };
+
+    bool missing = false;
+    for (const auto& key : required_keys) {
+        if (args.find(key) == args.end()) {
+            std::cerr << "Missing required argument: --" << key << std::endl;
+            missing = true;
+        }
+    }
+
+    if (missing) {
+        std::cerr << "Usage: " << argv[0]
+                << " --model_path <path> --gestures_folder_path <path> --language <lang>"
+                << " --socket_path <path> --num_gestures <int> --font_path <path>\n";
         return EXIT_FAILURE;
     }
 
-    const std::string model_path = argv[1];
-    const std::string gestures_folder_path = argv[2];
-    const std::string language = argv[3];
-    const std::string socket_path = argv[4];
-    int num_gestures = std::stoi(argv[5]);
-    const std::string font_path = argv[6];
+    // Example: retrieving arguments:
+    std::string model_path = args["--model_path"];
+    std::string gestures_folder_path = args["--gestures_folder_path"];
+    std::string language = args["--language"];
+    std::string socket_path = args["--socket_path"];
+    int num_gestures = std::stoi(args["--num_gestures"]);
+    std::string font_path = args["--font_path"];
 
     std::cout << "Starting Liveness Detector Server...\n";
 
