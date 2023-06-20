@@ -143,6 +143,15 @@ int main(int argc, char** argv) {
     int num_gestures = std::stoi(args["--num_gestures"]);
     std::string font_path = args["--font_path"];
 
+    std::vector<std::string> locales_paths;
+    if (args.find("--locales_paths") != args.end())
+        locales_paths = split_paths(args["--locales_paths"]);
+
+    for (const auto& folder : gestures_folders)
+        locales_paths.push_back(folder + "/locales");
+
+
+
     std::cout << "Starting Liveness Detector Server...\n";
 
     // Initialize callback_data_ as a JSON object
@@ -205,9 +214,7 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    // Create a TranslationManager using the locales folder inside the gestures_folder_path.
-    std::string locales_path = gestures_folder_path + "/locales";
-    TranslationManager translator(language, locales_path);
+    TranslationManager translator(language, locales_paths);
 
     // Create a GesturesRequester.
     GesturesRequester requester(static_cast<int>(loadedGestures.size()),

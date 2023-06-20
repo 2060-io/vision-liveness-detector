@@ -5,7 +5,14 @@
 #include <filesystem>
 
 TranslationManager::TranslationManager(std::string locale, const std::string& locales_dir)
-    : locales_dir(locales_dir), locale(locale), locale_not_found(false) {
+    : locales_dir(locales_dir), locale(locale), locale_not_found(false) 
+{
+    translations = load_translations(locale);
+}
+
+TranslationManager::TranslationManager(std::string locale, const std::vector<std::string>& locales_dirs)
+    : locales_dir(""), locales_dirs(locales_dirs), locale(locale), locale_not_found(false)
+{
     translations = load_translations(locale);
 }
 
@@ -57,14 +64,32 @@ nlohmann::json TranslationManager::load_translations(const std::string& locale) 
 }
 
 nlohmann::json TranslationManager::load_locale_file(const std::string& locale_name) {
-    std::cout << "loading local file: " << locale_name << std::endl;
+    nlohmann::json merged_json = nlohmann::json::object();
+    bool found_any = false;
+
+    if (!locales_dirs.empty()) {
+        for (const auto& dir : locales_dirs) {
+            std::string filename = (std::filesystem::path(dir) / (locale_name + ".json")).string();
+            std::ifstream f(filename);
+            if (f) {
+                nlohmann::json j;
+                f >> j;
+                merged_json.update(j);  // merge new keys/values, overwrite previous if overlapping
+                found_any = true;
+            }
+        }
+        if (!found_any) {
+            throw std::runtime_error("Locale file not found in provided local_dirs.");
+        }
+        return merged_json;
+    }
+
+    // Single legacy directory fallback
     std::string filename = (std::filesystem::path(locales_dir) / (locale_name + ".json")).string();
     std::ifstream f(filename);
-
     if (!f) {
         throw std::runtime_error("Locale file not found");
     }
-
     nlohmann::json j;
     f >> j;
     return j;
