@@ -8,6 +8,7 @@
 #include <opencv2/opencv.hpp> 
 #include <iostream>
 #include <vector>
+#include <set>
 #include <string>
 #include <map>
 #include <unordered_map>
@@ -129,8 +130,14 @@ int main(int argc, char** argv) {
 
     if (missing) {
         std::cerr << "Usage: " << argv[0]
-                << " --model_path <path> --gestures_folder_path <path1>:<path2> --language <lang>"
-                << " --socket_path <path> --num_gestures <int> --font_path <path>\n";
+                  << " --model_path <path>"
+                  << " --gestures_folder_path <path1>:<path2>"
+                  << " --language <lang>"
+                  << " --socket_path <path>"
+                  << " --num_gestures <int>"
+                  << " --font_path <path>"
+                  << " [--locales_paths <path1>:<path2>]"
+                  << " [--gestures_list <gesture1>:<gesture2>:...]\n";
         return EXIT_FAILURE;
     }
 
@@ -146,11 +153,15 @@ int main(int argc, char** argv) {
     std::vector<std::string> locales_paths;
     if (args.find("--locales_paths") != args.end())
         locales_paths = split_paths(args["--locales_paths"]);
+    
+    std::set<std::string> allowed_gestures;
+    if (args.find("--gestures_list") != args.end()) {
+        auto lst = split_paths(args["--gestures_list"]); // uses ':' by default
+        allowed_gestures = std::set<std::string>(lst.begin(), lst.end());
+    }
 
     for (const auto& folder : gestures_folders)
         locales_paths.push_back(folder + "/locales");
-
-
 
     std::cout << "Starting Liveness Detector Server...\n";
 
@@ -166,7 +177,10 @@ int main(int argc, char** argv) {
         try {
             for (const auto& entry : fs::directory_iterator(folder)) {
                 if (entry.path().extension() == ".json") {
-                    gestureFiles.push_back(entry.path().string());
+                    std::string basename = entry.path().stem().string(); // without extension
+                    if (allowed_gestures.empty() || allowed_gestures.count(basename) > 0) {
+                        gestureFiles.push_back(entry.path().string());
+                    }
                 }
             }
         } catch (fs::filesystem_error& e) {
