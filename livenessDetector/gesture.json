@@ -1,0 +1,30 @@
+{
+    "gestureId": "gesture1",
+    "label": "TestGesture",
+    "icon_path": "icon.png",
+    "signal_index": 1,
+    "total_recommended_max_time": 30.0,
+    "take_picture_at_the_end": false,
+    "instructions": [
+        {
+            "move_to_next_type": "higher",
+            "value": 10.0,
+            "reset": {
+                "type": "lower",
+                "value": 5.0
+            }
+        },
+        {
+            "move_to_next_type": "lower",
+            "value": 8.0,
+            "reset": {
+                "type": "timeout_after_ms",
+                "value": 5000
+            }
+        },
+        {
+            "move_to_next_type": "higher",
+            "value": 12.0
+        }
+    ]
+}

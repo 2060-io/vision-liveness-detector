@@ -1,0 +1,6 @@
+Compile in mediapipe's folder:
+bazel build --define MEDIAPIPE_DISABLE_GPU=1 //livenessDetectorServerApp:livenessDetectorServer
+
+
+Run in this folder:
+../bazel-bin/livenessDetectorServerApp/livenessDetectorServer ../../../../Downloads/face_landmarker.task ./gestures es /tmp/mysocket 2

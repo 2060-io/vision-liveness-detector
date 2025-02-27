@@ -1,0 +1,48 @@
+{
+    "gestures": {
+        "starting": {
+            "label": "Starting"
+        },
+        "notAlive": {
+            "label": "You are not alive"
+        },
+        "youarealive": {
+            "label": "You are alive"
+        },
+        "ok": {
+            "label": "Ok"
+        },
+        "blink": {
+            "label": "Blink your eyes"
+        },
+        "openCloseMouth": {
+            "label": "Open and close your mouth"
+        },
+        "smile": {
+            "label": "Smile and then Serious"
+        }
+    },
+    "error": {
+        "not_verified": "Not verified",
+        "failure_report_error": "Error: Failure report",
+        "getting_reference_images": "Error getting reference images",
+        "doing_face_match": "Error doing Face Match",
+        "does_not_meet_criteria_for_acceptable_face_match": "Doesn't meet the criteria for an acceptable face match.",
+        "success_report": "Error: Success report error",
+        "no_reference_images": "No reference images"
+    },
+    "message": {
+        "getting_reference_images": "Getting reference images",
+        "done":"Done!",
+        "doing_face_match": "Doing Face Match",
+        "of": "of",
+        "verified": "Verified"
+    },
+    "warning": {
+        "wrong_face_width_message": "Face width is not in the correct range.",
+        "wrong_face_height_message": "Face height is not in the correct range.",
+        "wrong_face_center_message": "Face center is not in the correct position.",
+        "face_not_detected_message": "Face detection failed. Check lighting conditions.",
+        "face_with_glasses_message": "You are using glasses, please remove them"
+    }
+}

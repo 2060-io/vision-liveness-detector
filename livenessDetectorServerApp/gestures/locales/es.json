@@ -1,0 +1,48 @@
+{
+    "gestures": {
+        "starting": {
+            "label": "Iniciando"
+        },
+        "ok": {
+            "label": "Ok"
+        },
+        "notAlive": {
+            "label": "No estás vivo"
+        },
+        "youarealive": {
+            "label": "Estás vivo"
+        },
+        "blink": {
+            "label": "parpadea tus ojos"
+        },
+        "openCloseMouth": {
+            "label": "Abre y cierra la boca"
+        },
+        "smile": {
+            "label": "Sonríe"
+        }
+    },
+    "error": {
+        "not_verified": "No verificado",
+        "failure_report_error": "Error: Reporte de falla",
+        "getting_reference_images": "Error: Obteniendo imágenes de referencia",
+        "doing_face_match": "Error: Haciendo coincidencia de rostros",
+        "does_not_meet_criteria_for_acceptable_face_match": "No cumple el criterio para hacer coincidencia de rostros.",
+        "success_report": "Error: Reporte de éxito",
+        "no_reference_images": "No hay imágenes de referencia"
+    },
+    "message": {
+        "getting_reference_images": "Obteniendo imágenes de referencia",
+        "done":"Hecho!",
+        "doing_face_match": "Haciendo coincidencia de rostros",
+        "of": "de",
+        "verified": "Verificado"
+    },
+    "warning": {
+        "wrong_face_width_message": "Ancho del rostro no está en el rango correcto.",
+        "wrong_face_height_message": "Alto del rostro no está en el rango correcto",
+        "wrong_face_center_message": "Centro del rostro no está en la correcta posición.",
+        "face_not_detected_message": "Falla en la detección del rostro. Verifique las condiciones de luz.",
+        "face_with_glasses_message": "Está utilizando gafas, por favor remuévalas."
+    }
+}
