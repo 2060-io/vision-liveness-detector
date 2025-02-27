@@ -1,6 +1,6 @@
 import cv2
 import time
-from livenessDetectorServerLauncher import GestureServerClient
+from liveness_detector.server_launcher import GestureServerClient
 
 def string_callback(message):
     print(f"Callback received message: {message}")
