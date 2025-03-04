@@ -4,6 +4,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <vector>
+#include <arpa/inet.h>
 
 UnixSocketServer::UnixSocketServer(const std::string& socketPath, ImageProcessingCallback callback)
     : socketPath(socketPath), processImageCallback(std::move(callback)), server_fd(-1) {}
