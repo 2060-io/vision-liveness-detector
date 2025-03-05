@@ -38,8 +38,13 @@ RUN wget https://apt.llvm.org/llvm.sh && \
     ln -sf /usr/bin/clang-format-16 /usr/bin/clang-format
 
 # Upgrade pip and install Python dependencies
-RUN pip3 install --upgrade setuptools && \
-    pip3 install wheel future absl-py "numpy<2" jax[cpu] opencv-contrib-python protobuf==3.20.1 six==1.14.0 tensorflow tf_slim
+RUN pip3 install --upgrade setuptools
+RUN pip3 install wheel
+RUN pip3 install future
+RUN pip3 install absl-py "numpy<2" jax[cpu] opencv-contrib-python protobuf==3.20.1
+RUN pip3 install six==1.14.0
+RUN pip3 install tensorflow
+RUN pip3 install tf_slim
 
 # Create a symbolic link for python
 RUN ln -s /usr/bin/python3 /usr/bin/python
