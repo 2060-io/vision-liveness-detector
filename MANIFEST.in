@@ -1,0 +1,17 @@
+# Include the README file
+include README.md
+
+# Include the LICENSE file
+include LICENSE
+
+# Include all files in the liveness_detector/bin directory, recursively
+recursive-include liveness_detector/bin *
+
+# Include all files in the livenessDetectorServerApp/gestures directory, recursively
+recursive-include livenessDetectorServerApp/gestures *
+
+# Include JSON files in the livenessDetector directory
+recursive-include livenessDetector *.json
+
+# Include images in the gestures/icons directories
+recursive-include livenessDetectorServerApp/gestures/icons *.png

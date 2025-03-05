@@ -73,7 +73,8 @@ RUN cp -r /vision-liveness-detector/livenessDetectorServerApp .
 RUN patch -p1 < /vision-liveness-detector/patch/opencv_from_distro_apt.patch
 
 # Build the project with Bazel
-RUN bazel build --jobs=5 -c opt --linkopt -s --strip always --define MEDIAPIPE_DISABLE_GPU=1 livenessDetectorServerApp:livenessDetectorServer
+RUN JOBS=$(nproc) && JOBS=$(( JOBS > 1 ? JOBS / 2 : 1 )) && \
+    bazel build --jobs=${JOBS} -c opt --linkopt -s --strip always --define MEDIAPIPE_DISABLE_GPU=1 livenessDetectorServerApp:livenessDetectorServer
 
 
 # Stage 2: Create the runtime image

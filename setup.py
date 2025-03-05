@@ -1,13 +1,29 @@
 from setuptools import setup, find_packages
 import os
+import platform
+import sys
 
-# Collecting the binaries for distribution
+def get_platform_bin_dir():
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    if system == "linux" and machine == "x86_64":
+        return "bin/linux_x86_64"
+    elif system == "windows" and machine.endswith("64"):
+        return "bin/windows_x64"  # Adjust the directory names as necessary
+    elif system == "darwin" and machine == "arm64":
+        return "bin/macos_arm64"
+    else:
+        sys.exit(f"Unsupported platform: {system} {machine}")
+
+binary_dir = "liveness_detector/" + get_platform_bin_dir()
+
 def collect_binaries(directory):
-    return [os.path.join('bin', f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    return [os.path.join(directory, f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
 # Package data for the compiled binaries
 package_data = {
-    'liveness_detector': collect_binaries('liveness_detector/bin'),
+    'liveness_detector': collect_binaries(binary_dir),
 }
 
 setup(
@@ -30,6 +46,6 @@ setup(
     ],
     python_requires='>=3.6',
     install_requires=[
-        # Specify external dependencies here
+        # List required Python dependencies here
     ],
 )
