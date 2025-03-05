@@ -1,9 +1,9 @@
-# Use the ubuntu:22.04 base image
-FROM ubuntu:22.04
+# Stage 1: Build the application
+FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update package lists and install necessary packages
+# Update package lists and install necessary packages for building
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -73,4 +73,29 @@ RUN cp -r /vision-liveness-detector/livenessDetectorServerApp .
 RUN patch -p1 < /vision-liveness-detector/patch/opencv_from_distro_apt.patch
 
 # Build the project with Bazel
-#RUN bazel build --jobs=5 -c opt --linkopt -s --strip always --define MEDIAPIPE_DISABLE_GPU=1 livenessDetectorServerApp:livenessDetectorServer
+RUN bazel build --jobs=5 -c opt --linkopt -s --strip always --define MEDIAPIPE_DISABLE_GPU=1 livenessDetectorServerApp:livenessDetectorServer
+
+
+# Stage 2: Create the runtime image
+FROM ubuntu:22.04 AS runtime
+
+# Install necessary runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libopencv-core4.5 \
+        libopencv-calib3d4.5 \
+        libopencv-features2d4.5 \
+        libopencv-highgui4.5 \
+        libopencv-imgcodecs4.5 \
+        libopencv-imgproc4.5 \
+        libopencv-video4.5 \
+        libopencv-videoio4.5 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the built binary from the builder stage
+COPY --from=builder /mediapipe/bazel-bin/livenessDetectorServerApp/livenessDetectorServer /usr/local/bin/livenessDetectorServer
+
+# Set the entrypoint
+#ENTRYPOINT ["/usr/local/bin/livenessDetectorServer"]
