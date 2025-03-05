@@ -70,7 +70,7 @@ COPY . /vision-liveness-detector
 # Copy necessary parts
 RUN cp -r /vision-liveness-detector/livenessDetector .
 RUN cp -r /vision-liveness-detector/livenessDetectorServerApp .
-RUN git apply /vision-liveness-detector/patch/opencv_from_distro_apt.patch
+RUN patch -p1 < /vision-liveness-detector/patch/opencv_from_distro_apt.patch
 
 # Build the project with Bazel
 #RUN bazel build --jobs=5 -c opt --linkopt -s --strip always --define MEDIAPIPE_DISABLE_GPU=1 livenessDetectorServerApp:livenessDetectorServer
