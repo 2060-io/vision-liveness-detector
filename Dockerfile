@@ -64,6 +64,7 @@ ENV CXX=clang++
 
 # Copy the local repository content into the Docker image
 WORKDIR /mediapipe
+RUN git clone --depth 1 --branch v0.10.20 --single-branch https://github.com/google/mediapipe.git .
 COPY . /vision-liveness-detector
 
 # Copy necessary parts
