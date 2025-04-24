@@ -1,16 +1,31 @@
 import socket
 import os
+import platform
 import subprocess
 import signal
 import time
 import numpy as np
 import json
 
+
+def get_server_executable_path():
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    if system == "linux" and machine == "x86_64":
+        return "./server/livenessDetectorServer"
+    elif system == "windows" and machine.endswith("64"):
+        return "./server/livenessDetectorServer.exe"  # Adjust the directory names as necessary
+    elif system == "darwin" and machine == "arm64":
+        return "./server/livenessDetectorServer"
+    else:
+        sys.exit(f"Unsupported platform: {system} {machine}")
+
 class GestureServerClient:
-    def __init__(self, server_executable_path, model_path, gestures_folder_path, language, socket_path, num_gestures):
-        self.server_executable_path = server_executable_path
-        self.model_path = model_path
-        self.gestures_folder_path = gestures_folder_path
+    def __init__(self, language, socket_path, num_gestures):
+        self.server_executable_path = os.path.join(os.path.dirname(__file__), get_server_executable_path())
+        self.model_path = os.path.join(os.path.dirname(__file__),'./model/face_landmarker.task')
+        self.gestures_folder_path = os.path.join(os.path.dirname(__file__),'./gestures')
         self.language = language
         self.socket_path = socket_path
         self.num_gestures = num_gestures

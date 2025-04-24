@@ -18,9 +18,6 @@ def report_alive_callback(alive):
 def main():
     # Setup the class with the necessary parameters
     server_client = GestureServerClient(
-        server_executable_path="/Users/diegoaguilar/pruebas/mediapipe_mac/mediapipe/bazel-bin/livenessDetectorServerApp/livenessDetectorServer",
-        model_path="/Users/diegoaguilar/Downloads/face_landmarker.task",
-        gestures_folder_path="/Users/diegoaguilar/pruebas/mediapipe_mac/mediapipe/livenessDetectorServerApp/gestures",
         language="en",
         socket_path="/tmp/mysocket",
         num_gestures=2
