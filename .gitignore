@@ -1,1 +1,8 @@
-my_chats
+build
+dist
+*.egg-info
+myenv
+__pycache__
+wrappers/python/liveness_detector/server
+wrappers/python/liveness_detector/gestures
+wrappers/python/liveness_detector/*.json
