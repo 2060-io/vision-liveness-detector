@@ -10,5 +10,7 @@ cc_binary(
         "//livenessDetector:nlohmann",
         "//third_party:opencv",
     ],
+    copts   = ["-std=c++17"],       # enable C++17 for <filesystem>
+    linkopts = ["-lstdc++fs"],      # pull in the filesystem library
     visibility = ["//visibility:public"],
 )
