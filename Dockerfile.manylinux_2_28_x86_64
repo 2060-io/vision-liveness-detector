@@ -91,5 +91,10 @@ RUN cp build/mediapipe/bazel-bin/livenessDetectorServerApp/livenessDetectorServe
 RUN cp -R src/livenessDetectorServerApp/gestures ./wrappers/python/liveness_detector
 #RUN cp -R src/livenessDetector/*.json ../../wrappers/python/liveness_detector
 
-RUN cd ./wrappers/python && python setup.py bdist_wheel --python-tag=py3 --plat-name=manylinux2014_x86_64
+RUN $PYTHON_BIN -m pip install --upgrade pip setuptools
+RUN $PYTHON_BIN -m pip install wheel auditwheel
+RUN ln -sf $PYTHON_BIN /usr/bin/python && \
+    ln -sf $PYTHON_BIN /usr/bin/python3
+
+RUN cd ./wrappers/python && $PYTHON_BIN setup.py bdist_wheel --python-tag=py3 --plat-name=manylinux2014_x86_64
 
