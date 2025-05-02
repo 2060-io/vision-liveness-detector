@@ -74,9 +74,11 @@ RUN cd build/mediapipe/ && echo "build --client_env=CC=/usr/lib/llvm-18/bin/clan
     echo "build --define=MEDIAPIPE_DISABLE_GPU=1" >> .bazelrc && \
     echo 'cc_library(name = "opencv", srcs = [ "local/lib64/libopencv_core.a", "local/lib64/libopencv_imgproc.a", "local/lib64/libopencv_highgui.a", "local/lib64/libopencv_video.a", "local/lib64/libopencv_videoio.a", "local/lib64/libopencv_imgcodecs.a", ], hdrs = glob(["local/include/opencv4/opencv2/**/*.h*"]), includes = ["local/include/opencv4/"], linkstatic = 1, linkopts = [ "-ljpeg", "-lpng", "-lz", "-ltiff", "-lwebp", "-lopenjp2", "-lIlmImf", "-lImath", "-lHalf", "-lIex", "-lIexMath", "-lIlmThread", ], visibility = ["//visibility:public"], )' > third_party/opencv_linux.BUILD
 
-RUN export PATH=$PYTHON_BIN:$PATH
-RUN echo 'export PATH=/opt/python/cp312-cp312/bin:$PATH' >> ~/.bashrc
-RUN source ~/.bashrc
+# Set the environment variable for your Python binary (optional)
+ENV PYTHON_BIN=/opt/python/cp312-cp312/bin/python3.12
+
+# Prepend the Python directory to the PATH for all following layers/commands
+ENV PATH="/opt/python/cp312-cp312/bin:${PATH}"
 
 RUN cd build/mediapipe/ && bazel build -c opt --linkopt -s --strip always --define MEDIAPIPE_DISABLE_GPU=1 livenessDetectorServerApp:livenessDetectorServer
 RUN cp audit_livenessDetectorServerApp.sh ./build/mediapipe/bazel-bin/livenessDetectorServerApp/
