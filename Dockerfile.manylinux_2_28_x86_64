@@ -87,6 +87,7 @@ RUN cd build/mediapipe/bazel-bin/livenessDetectorServerApp/ && \
 
 RUN mkdir -p ./wrappers/python/liveness_detector/server
 RUN cp build/mediapipe/bazel-bin/livenessDetectorServerApp/livenessDetectorServer ./wrappers/python/liveness_detector/server/
+RUN cp -r build/mediapipe/bazel-bin/livenessDetectorServerApp/livenessDetectorServer/lib ./wrappers/python/liveness_detector/server/lib
 
 RUN cp -R src/livenessDetectorServerApp/gestures ./wrappers/python/liveness_detector
 #RUN cp -R src/livenessDetector/*.json ../../wrappers/python/liveness_detector
