@@ -1,5 +1,8 @@
 # Make a container for Liveness Detection with MediaPipe
 # Based on the official MediaPipe manylinux_2_28_x86_64 Dockerfile
+
+# Run with:
+# DOCKER_BUILDKIT=1 docker build -f Dockerfile.manylinux_2_28_x86_64 -t mediapipe_liveness_detector:latest --build-arg PYTHON_BIN=/opt/python/cp312-cp312/bin/python3.12 .
 FROM quay.io/pypa/manylinux_2_28_x86_64
 
 
@@ -70,3 +73,8 @@ RUN cd build/mediapipe/ && echo "build --client_env=CC=/usr/lib/llvm-18/bin/clan
     echo "build --define=xnn_enable_avxvnniint8=false" >> .bazelrc && \
     echo "build --define=MEDIAPIPE_DISABLE_GPU=1" >> .bazelrc && \
     echo 'cc_library(name = "opencv", srcs = [ "local/lib64/libopencv_core.a", "local/lib64/libopencv_imgproc.a", "local/lib64/libopencv_highgui.a", "local/lib64/libopencv_video.a", "local/lib64/libopencv_videoio.a", "local/lib64/libopencv_imgcodecs.a", ], hdrs = glob(["local/include/opencv4/opencv2/**/*.h*"]), includes = ["local/include/opencv4/"], linkstatic = 1, linkopts = [ "-ljpeg", "-lpng", "-lz", "-ltiff", "-lwebp", "-lopenjp2", "-lIlmImf", "-lImath", "-lHalf", "-lIex", "-lIexMath", "-lIlmThread", ], visibility = ["//visibility:public"], )' > third_party/opencv_linux.BUILD
+
+RUN cd build/mediapipe/ && bazel build -c opt --linkopt -s --strip always --define MEDIAPIPE_DISABLE_GPU=1 livenessDetectorServerApp:livenessDetectorServer
+RUN cp audit_livenessDetectorServerApp.sh ./build/mediapipe/bazel-bin/livenessDetectorServerApp/
+RUN cd build/mediapipe/bazel-bin/livenessDetectorServerApp/ && \
+    ./audit_livenessDetectorServerApp.sh

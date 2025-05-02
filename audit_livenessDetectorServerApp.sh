@@ -30,7 +30,7 @@ for lib in "${libs[@]}"; do
 done
 
 # 3. Patch RPATH of binary
-patchelf --set-rpath '$ORIGIN/lib' ./livenessDetectorServerMod
+patchelf --set-rpath '$ORIGIN/lib' ./livenessDetectorServer
 
 # 4. Patch RPATH of libs (optional, but recommended for transitive deps)
 for f in ./lib/*.so*; do
