@@ -14,6 +14,7 @@ setup(
         "": [
                 "server/livenessDetectorServer",
                 "server/livenessDetectorServer.exe",
+                "server/lib/*",
             ]
         },
     include_package_data=True,
