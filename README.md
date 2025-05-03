@@ -12,54 +12,58 @@ Liveness Detector is a project designed to detect user liveness, leveraging a se
 
 ## Setup and Installation
 
-### Prerequisites
+### Requirements
 
-- Python 3.6 or above (up to 3.12)
-- Bazel (for building the server)
-- OpenCV
-- MediaPipe (as a submodule)
+- Docker with BUILDKIT enabled must be installed and running on your system.
+- Python 3.6 or above (up to 3.12) for using the generated wheel.
 
+### Build
 
-> *NOTE*: if you run into troubles when linking OpenCV headers, try adding a symbolic link to opencv4 with opencv2, i.e.:
-> sudo ln -s /usr/include/opencv4/opencv2 /usr/include/opencv2                                      
-> 
-### Installation
+To build the Python wheel, simply run:
 
-1. **Clone the repository:**
+```bash
+./build.sh
+```
 
-    ```bash
-    git clone https://your.repo.url/liveness-detector.git
-    cd liveness-detector
-    ```
+This will use the provided `Dockerfile.manylinux_2_28_x86_64` to build the project inside a Docker container. After the build completes, the Python wheel file will be generated at:
 
-2. **Set up the project:**
+```
+wrappers/python/dist/liveness_detector-0.1.0-py3-none-manylinux2014_x86_64.whl
+```
 
-    Run the setup script to copy the necessary files into the MediaPipe directory.
+### Publish
 
-    ```bash
-    ./setup_for_build.sh
-    ```
+To publish the generated wheel to PyPI, use:
 
-3. **Build the server application:**
+```bash
+./publish.sh
+```
 
-    Navigate to the MediaPipe directory and build using Bazel. 
+This script uses `twine` to upload all files in `wrappers/python/dist/` to the Python Package Index (PyPI). You must have a valid PyPI account and credentials configured (typically via a `~/.pypirc` file or environment variables) before running the script.
 
-    ```bash
-    cd build/mediapipe
-    bazel build --define MEDIAPIPE_DISABLE_GPU=1 //livenessDetectorServerApp:livenessDetectorServer
-    ```
+After publishing, anyone can install the package directly from PyPI using:
 
-4. **Install the Python package:**
-
-    Return to the project root and install the Python package using pip.
-
-    ```bash
-    pip install .
-    ```
+```bash
+pip install liveness_detector
+```
 
 ## Usage
 
-To launch the liveness detector server using the Python launcher:
+After building, you can install the Python package in two ways:
+
+- **Install the locally built wheel:**
+
+    ```bash
+    pip install wrappers/python/dist/liveness_detector-0.1.0-py3-none-manylinux2014_x86_64.whl
+    ```
+
+- **Install from PyPI (after publishing):**
+
+    ```bash
+    pip install liveness_detector
+    ```
+
+You can then launch the liveness detector server using the Python launcher:
 
 ```bash
 liveness-detector-launcher
@@ -84,4 +88,3 @@ This project is licensed under the GNU AFFERO GENERAL PUBLIC LICENSE - see the [
 ## Contact
 
 For issues, please open an issue via the repository's issue tracker.
-
