@@ -25,6 +25,9 @@ GesturesRequester::GesturesRequester(int number_of_gestures,
     gesture_detector_->set_signal_trigger_callback([this](const std::string& label) {
         this->gesture_detected_callback(label);
     });
+    std::string font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"; //TODO: allow to set this
+    ft_ = cv::freetype::createFreeType2();  // Initialize the FreeType2 object
+    ft_->loadFontData(font_path, 0);        // Load the font data
 }
 
 GesturesRequester::~GesturesRequester() {
@@ -56,13 +59,13 @@ cv::Mat GesturesRequester::process_image(cv::Mat img,
         text = overwrite_text_;
     }
     
-    add_text_to_image(img_out, text);
+    add_text_with_freetype(ft_, img_out, text);
     if (!icon.empty()) {
         add_icon_to_image(img_out, icon, 550, 400);
     }
     
     if (!warning_message.empty()) {
-        add_text_to_image(img_out, warning_message, 80, cv::Scalar(0, 255, 255));
+        add_text_with_freetype(ft_, img_out, warning_message, 10, cv::Scalar(0, 255, 255));
     }
     
     return img_out;
@@ -287,6 +290,99 @@ void GesturesRequester::add_text_to_image(cv::Mat& image,
         cv::putText(image, lines[i], text_org, font_face, font_scale, text_color, thickness, cv::LINE_AA);
     }
 }
+
+
+std::vector<std::string> GesturesRequester::split_text_freetype(
+    cv::Ptr<cv::freetype::FreeType2> ft2,
+    const std::string& text,
+    int image_width,
+    int font_height,
+    int thickness,
+    int margin) 
+{
+    std::vector<std::string> lines;
+    std::vector<std::string> input_lines;
+    size_t start = 0;
+    size_t end = text.find('\n');
+
+    while (end != std::string::npos) {
+        input_lines.push_back(text.substr(start, end - start));
+        start = end + 1;
+        end = text.find('\n', start);
+    }
+    input_lines.push_back(text.substr(start));
+
+    int max_width = image_width - 2 * margin;
+
+    for (const auto& line : input_lines) {
+        cv::Size text_size = ft2->getTextSize(line, font_height, thickness, nullptr);
+        if (text_size.width <= max_width) {
+            lines.push_back(line);
+            continue;
+        }
+
+        std::vector<std::string> words;
+        size_t word_start = 0;
+        size_t space_pos = line.find(' ');
+        while (space_pos != std::string::npos) {
+            words.push_back(line.substr(word_start, space_pos - word_start));
+            word_start = space_pos + 1;
+            space_pos = line.find(' ', word_start);
+        }
+        words.push_back(line.substr(word_start));
+
+        std::string current_line;
+        for (const auto& word : words) {
+            std::string test_line = current_line.empty() ? word : current_line + " " + word;
+            cv::Size test_size = ft2->getTextSize(test_line, font_height, thickness, nullptr);
+            if (test_size.width <= max_width) {
+                current_line = test_line;
+            } else {
+                if (!current_line.empty()) {
+                    lines.push_back(current_line);
+                }
+                current_line = word;
+            }
+        }
+        if (!current_line.empty()) {
+            lines.push_back(current_line);
+        }
+    }
+    return lines;
+}
+
+
+void GesturesRequester::add_text_with_freetype(
+    cv::Ptr<cv::freetype::FreeType2> ft2,
+    cv::Mat& image,
+    const std::string& text,
+    double y_pos_percent,
+    cv::Scalar text_color,
+    cv::Scalar text_bg_color,
+    int fontHeight
+)
+{
+    int thickness = -1;
+    int margin = 10;
+
+    std::vector<std::string> lines = split_text_freetype(ft2, text, image.cols, fontHeight, thickness, margin);
+
+    int y = static_cast<int>(y_pos_percent * image.rows / 100.0);
+    int line_spacing = fontHeight + 6;
+
+    for(size_t i=0; i<lines.size(); ++i) {
+        cv::Size text_size = ft2->getTextSize(lines[i], fontHeight, thickness, nullptr);
+        int x = (image.cols - text_size.width) / 2;
+        int y_i = y + static_cast<int>(i*line_spacing);
+
+        cv::Point text_org(x, y_i);
+
+        int outline_thickness = 10;
+        ft2->putText(image, lines[i], text_org, fontHeight, text_bg_color, outline_thickness, cv::LINE_AA, true);
+        ft2->putText(image, lines[i], text_org, fontHeight, text_color, thickness, cv::LINE_AA, true);
+    }
+}
+
 
 std::pair<std::string, cv::Mat> GesturesRequester::process_requests() {
     if (start_time_) {
