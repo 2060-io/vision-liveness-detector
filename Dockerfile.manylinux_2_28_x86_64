@@ -74,7 +74,7 @@ RUN ./setup_for_build.sh
 RUN cd build/mediapipe/ && echo "build --client_env=CC=/usr/lib/llvm-18/bin/clang++" >> .bazelrc && \
     echo "build --define=xnn_enable_avxvnniint8=false" >> .bazelrc && \
     echo "build --define=MEDIAPIPE_DISABLE_GPU=1" >> .bazelrc && \
-    echo 'cc_library(name = "opencv", srcs = [ "local/lib64/libopencv_core.a", "local/lib64/libopencv_imgproc.a", "local/lib64/libopencv_highgui.a", "local/lib64/libopencv_video.a", "local/lib64/libopencv_videoio.a", "local/lib64/libopencv_imgcodecs.a", ], hdrs = glob(["local/include/opencv4/opencv2/**/*.h*"]), includes = ["local/include/opencv4/"], linkstatic = 1, linkopts = [ "-ljpeg", "-lpng", "-lz", "-ltiff", "-lwebp", "-lopenjp2", "-lIlmImf", "-lImath", "-lHalf", "-lIex", "-lIexMath", "-lIlmThread", ], visibility = ["//visibility:public"], )' > third_party/opencv_linux.BUILD
+    echo 'cc_library(name = "opencv", srcs = [ "local/lib64/libopencv_core.a", "local/lib64/libopencv_imgproc.a", "local/lib64/libopencv_highgui.a", "local/lib64/libopencv_video.a", "local/lib64/libopencv_videoio.a", "local/lib64/libopencv_imgcodecs.a", "local/lib64/libopencv_freetype.a"], hdrs = glob(["local/include/opencv4/opencv2/**/*.h*"]), includes = ["local/include/opencv4/"], linkstatic = 1, linkopts = [ "-ljpeg", "-lpng", "-lz", "-ltiff", "-lwebp", "-lopenjp2", "-lIlmImf", "-lImath", "-lHalf", "-lIex", "-lIexMath", "-lIlmThread", "-lfreetype", "-lharfbuzz"], visibility = ["//visibility:public"], )' > third_party/opencv_linux.BUILD
 
 # Set the environment variable for your Python binary (optional)
 ENV PYTHON_BIN=/opt/python/cp312-cp312/bin/python3.12
