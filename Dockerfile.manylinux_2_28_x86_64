@@ -17,7 +17,7 @@ RUN yum install -y \
     mesa-libGL mesa-libGL-devel mesa-libEGL mesa-libEGL-devel mesa-libGLES-devel \
     epel-release emacs portaudio-devel \
     libjpeg-turbo-devel libpng-devel libtiff-devel libwebp-devel \
-    openjpeg2-devel OpenEXR-devel zlib-devel
+    openjpeg2-devel OpenEXR-devel zlib-devel freetype-devel
 
 # Install Bazel 6.5.0
 WORKDIR /tmp/bazel_build
