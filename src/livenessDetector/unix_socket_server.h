@@ -8,8 +8,13 @@
 class UnixSocketServer {
 public:
     using ImageProcessingCallback = std::function<std::pair<cv::Mat, std::string>(const cv::Mat&)>;
+    using DataProcessingCallback = std::function<std::string(const std::string&)>;
 
-    UnixSocketServer(const std::string& socketPath, ImageProcessingCallback callback);
+    UnixSocketServer(
+        const std::string& socketPath,
+        ImageProcessingCallback imgCallback,
+        DataProcessingCallback dataCallback
+    );
     ~UnixSocketServer();
 
     bool start();
@@ -18,6 +23,7 @@ public:
 private:
     std::string socketPath;
     ImageProcessingCallback processImageCallback;
+    DataProcessingCallback processDataCallback;
     int server_fd;
 
     bool processClient(int client_fd);

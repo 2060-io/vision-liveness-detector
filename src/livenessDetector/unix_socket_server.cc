@@ -6,8 +6,13 @@
 #include <vector>
 #include <arpa/inet.h>
 
-UnixSocketServer::UnixSocketServer(const std::string& socketPath, ImageProcessingCallback callback)
-    : socketPath(socketPath), processImageCallback(std::move(callback)), server_fd(-1) {}
+UnixSocketServer::UnixSocketServer(const std::string& socketPath,
+                                   ImageProcessingCallback imgCallback,
+                                   DataProcessingCallback dataCallback)
+    : socketPath(socketPath),
+      processImageCallback(std::move(imgCallback)),
+      processDataCallback(std::move(dataCallback)),
+      server_fd(-1) {}
 
 UnixSocketServer::~UnixSocketServer() {
     if (server_fd != -1) {
@@ -128,8 +133,42 @@ bool UnixSocketServer::processClient(int client_fd) {
         write(client_fd, &net_rows, sizeof(net_rows));
         write(client_fd, &net_cols, sizeof(net_cols));
         write(client_fd, processed_img.data, processed_img.total() * processed_img.elemSize());
-    } else if (function_id == 0x02) {
-        // Handle another function
+    } else if (function_id == 0x02) { // JSON config/setup
+        uint32_t json_size;
+        if (read(client_fd, &json_size, sizeof(json_size)) != sizeof(json_size)) {
+            std::cerr << "Failed to read JSON size\n";
+            return false;
+        }
+        json_size = ntohl(json_size);
+    
+        std::vector<char> json_buffer(json_size);
+        size_t total_received = 0;
+        while (total_received < json_size) {
+            ssize_t r = read(client_fd, json_buffer.data() + total_received, json_size - total_received);
+            if (r <= 0) {
+                std::cerr << "Client disconnected or read error for JSON\n";
+                return false;
+            }
+            total_received += r;
+        }
+    
+        std::string json_str(json_buffer.data(), json_buffer.size());
+        std::cout << "Received JSON: " << json_str << std::endl;
+    
+        // send the JSON to the callback
+        info_string = processDataCallback(json_str);
+        
+        if (!info_string.empty()) {
+            // Send string information
+            uint8_t response_function_id = 0x02; // For string data
+            uint32_t string_size = info_string.size();
+            string_size = htonl(string_size);
+
+            write(client_fd, &response_function_id, sizeof(response_function_id));
+            write(client_fd, &string_size, sizeof(string_size));
+            write(client_fd, info_string.data(), info_string.size());
+        }
+
     }
 
     return true;

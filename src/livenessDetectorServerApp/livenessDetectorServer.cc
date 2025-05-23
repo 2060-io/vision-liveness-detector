@@ -144,8 +144,29 @@ int main(int argc, char** argv) {
 
         return {processedImage, callback_data};
     };
+ 
+    auto dataProcessingCallback = [](const std::string& json_str) -> std::string {
+        try {
+            auto j = nlohmann::json::parse(json_str);
+            if (j.contains("action") && j["action"] == "set" &&
+                j.contains("variable") && j["variable"] == "font_path" &&
+                j.contains("value") && j["value"].is_string()) 
+            {
+                std::string fontPath = j["value"];
+                std::cout << "[Config] Set font_path to: " << fontPath << std::endl;
+                // Future: actually set it in your app state as needed
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[Config] JSON parse error: " << e.what() << std::endl;
+        }
+        return std::string();
+    };
 
-    UnixSocketServer socketServer(socket_path, imageProcessingCallback);
+    UnixSocketServer socketServer(
+        socket_path, 
+        imageProcessingCallback,
+        dataProcessingCallback
+    );
 
     if (!socketServer.start()) {
         std::cerr << "Failed to start UnixSocketServer.\n";
