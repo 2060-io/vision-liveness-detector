@@ -48,6 +48,10 @@ class GestureServerClient:
         """ Set the callback function for the reportAlive event. """
         self.report_alive_callback = callback
 
+    def set_font_path(self, font_path):
+        """ Set the font path to be used. Use it before call start_server. """
+        self.font_path = font_path
+
     def cleanup_socket(self):
         """ Remove the socket file if it exists. """
         try:
