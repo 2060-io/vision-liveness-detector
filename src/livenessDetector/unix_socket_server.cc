@@ -156,7 +156,7 @@ bool UnixSocketServer::processClient(int client_fd) {
         std::cout << "Received JSON: " << json_str << std::endl;
     
         // send the JSON to the callback
-        info_string = processDataCallback(json_str);
+        std::string info_string = processDataCallback(json_str);
         
         if (!info_string.empty()) {
             // Send string information
