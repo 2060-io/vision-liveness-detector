@@ -38,9 +38,10 @@ public:
     };
 
     GesturesRequester(int number_of_gestures,
-                     GestureDetector* gesture_detector,
-                     TranslationManager* translator,
-                     DebugLevel debug_level = DebugLevel::OFF);
+                      GestureDetector* gesture_detector,
+                      TranslationManager* translator,
+                      const std::string& font_path,
+                      DebugLevel debug_level = DebugLevel::OFF);
     
     ~GesturesRequester();
 

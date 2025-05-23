@@ -26,6 +26,7 @@ class GestureServerClient:
         self.server_executable_path = os.path.join(os.path.dirname(__file__), get_server_executable_path())
         self.model_path = os.path.join(os.path.dirname(__file__),'./model/face_landmarker.task')
         self.gestures_folder_path = os.path.join(os.path.dirname(__file__),'./gestures')
+        self.font_path = os.path.join(os.path.dirname(__file__),'./fonts/DejaVuSans.ttf') #Set the dafault font
         self.language = language
         self.socket_path = socket_path
         self.num_gestures = num_gestures
@@ -66,7 +67,8 @@ class GestureServerClient:
             self.gestures_folder_path,
             self.language,
             self.socket_path,
-            str(self.num_gestures)
+            str(self.num_gestures),
+            self.font_path
         ]
 
         print("Launching server...")

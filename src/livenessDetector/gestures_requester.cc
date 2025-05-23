@@ -8,9 +8,10 @@
 using namespace std::chrono;
 
 GesturesRequester::GesturesRequester(int number_of_gestures,
-                                   GestureDetector* gesture_detector,
-                                   TranslationManager* translator,
-                                   DebugLevel debug_level)
+                                     GestureDetector* gesture_detector,
+                                     TranslationManager* translator,
+                                     const std::string& font_path,
+                                     DebugLevel debug_level)
     : number_of_gestures_to_request_(number_of_gestures),
       debug_level_(debug_level),
       gesture_detector_(gesture_detector),
@@ -25,7 +26,7 @@ GesturesRequester::GesturesRequester(int number_of_gestures,
     gesture_detector_->set_signal_trigger_callback([this](const std::string& label) {
         this->gesture_detected_callback(label);
     });
-    std::string font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"; //TODO: allow to set this
+    
     ft_ = cv::freetype::createFreeType2();  // Initialize the FreeType2 object
     ft_->loadFontData(font_path, 0);        // Load the font data
 }

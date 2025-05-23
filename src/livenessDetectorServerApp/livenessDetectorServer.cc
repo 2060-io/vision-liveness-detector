@@ -19,8 +19,8 @@ using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 int main(int argc, char** argv) {
-    if (argc != 6) {
-        std::cerr << "Usage: " << argv[0] << " <model_path> <gestures_folder_path> <language> <socket_path> <num_gestures>\n";
+    if (argc != 7) {
+        std::cerr << "Usage: " << argv[0] << " <model_path> <gestures_folder_path> <language> <socket_path> <num_gestures> <font_path>\n";
         return EXIT_FAILURE;
     }
 
@@ -29,6 +29,7 @@ int main(int argc, char** argv) {
     const std::string language = argv[3];
     const std::string socket_path = argv[4];
     int num_gestures = std::stoi(argv[5]);
+    const std::string font_path = argv[6];
 
     std::cout << "Starting Liveness Detector Server...\n";
 
@@ -96,6 +97,7 @@ int main(int argc, char** argv) {
     GesturesRequester requester(static_cast<int>(loadedGestures.size()),
                                 &detector,
                                 &translator,
+                                font_path,
                                 GesturesRequester::DebugLevel::INFO);
 
     requester.set_gestures_list(loadedGestures);
@@ -103,14 +105,12 @@ int main(int argc, char** argv) {
     // Capture the local variables by reference in the lambda
     requester.set_ask_to_take_picture_callback([&callback_data_json]() {
         std::cout << "[Callback] Ask to take picture triggered.\n";
-
         // Add or update the 'takeAPicture' key in the callback_data_json object
         callback_data_json["takeAPicture"] = true;
     });
 
     requester.set_report_alive_callback([&callback_data_json](bool alive) {
         std::cout << "[Callback] GesturesRequester is " << (alive ? "alive" : "not alive") << ".\n";
-
         // Add or update the 'reportAlive' key in the callback_data_json object
         callback_data_json["reportAlive"] = alive;
     });
@@ -122,19 +122,16 @@ int main(int argc, char** argv) {
         const std::map<std::string, float>& transformationValues) {
             // Create an unordered_map to hold the converted blendshapes
             std::unordered_map<std::string, double> convertedBlendshapes;
-
             // Convert each element type
             for (const auto& pair : blendshapes) {
                 convertedBlendshapes[pair.first] = static_cast<double>(pair.second);
             }
-
             // Call process_signals with the converted map
             detector.process_signals(convertedBlendshapes);
     });
 
     // Create a UnixSocketServer using the provided socket path.
     auto imageProcessingCallback = [&requester, &processor, &callback_data_json](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
-
         processor.ProcessImage(inputImage);
 
         std::unordered_map<std::string, double> npoints;  // empty points; extend as needed!
