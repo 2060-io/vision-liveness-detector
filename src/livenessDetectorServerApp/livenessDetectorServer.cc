@@ -36,6 +36,8 @@ int main(int argc, char** argv) {
     // Initialize callback_data_ as a JSON object
     json callback_data_json;
 
+    std::string warning_message = "";
+
     // Load gesture definitions from JSON files.
     std::vector<std::string> gestureFiles;
 
@@ -131,11 +133,10 @@ int main(int argc, char** argv) {
     });
 
     // Create a UnixSocketServer using the provided socket path.
-    auto imageProcessingCallback = [&requester, &processor, &callback_data_json](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
+    auto imageProcessingCallback = [&requester, &processor, &callback_data_json, &warning_message](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
         processor.ProcessImage(inputImage);
 
         std::unordered_map<std::string, double> npoints;  // empty points; extend as needed!
-        std::string warning_message = "";
         cv::Mat processedImage = requester.process_image(inputImage, 0, npoints, warning_message);
 
         // Serialize the accumulated JSON object to a string
@@ -145,16 +146,15 @@ int main(int argc, char** argv) {
         return {processedImage, callback_data};
     };
  
-    auto dataProcessingCallback = [](const std::string& json_str) -> std::string {
+    auto dataProcessingCallback = [&warning_message](const std::string& json_str) -> std::string {
         try {
             auto j = nlohmann::json::parse(json_str);
             if (j.contains("action") && j["action"] == "set" &&
-                j.contains("variable") && j["variable"] == "font_path" &&
+                j.contains("variable") && j["variable"] == "warning_message" &&
                 j.contains("value") && j["value"].is_string()) 
             {
-                std::string fontPath = j["value"];
-                std::cout << "[Config] Set font_path to: " << fontPath << std::endl;
-                // Future: actually set it in your app state as needed
+                warning_message = j["value"];
+                std::cout << "[Config] Set warning_message to: " << warning_message << std::endl;
             }
         } catch (const std::exception& e) {
             std::cerr << "[Config] JSON parse error: " << e.what() << std::endl;
