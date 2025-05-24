@@ -146,20 +146,30 @@ int main(int argc, char** argv) {
         return {processedImage, callback_data};
     };
  
-    auto dataProcessingCallback = [&warning_message](const std::string& json_str) -> std::string {
+    auto dataProcessingCallback = [&warning_message, &requester](const std::string& json_str) -> std::string {
         try {
             auto j = nlohmann::json::parse(json_str);
+    
+            // Check all required fields before proceeding
             if (j.contains("action") && j["action"] == "set" &&
-                j.contains("variable") && j["variable"] == "warning_message" &&
-                j.contains("value") && j["value"].is_string()) 
+                j.contains("variable") && j["variable"].is_string() &&
+                j.contains("value") && j["value"].is_string())
             {
-                warning_message = j["value"];
-                std::cout << "[Config] Set warning_message to: " << warning_message << std::endl;
+                const std::string& variable = j["variable"];
+                const std::string& value = j["value"];
+    
+                if (variable == "warning_message") {
+                    warning_message = value;
+                    std::cout << "[Config] Set warning_message to: " << warning_message << std::endl;
+                } else if (variable == "overwrite_text") {
+                    requester.set_overwrite_text(value);
+                    std::cout << "[Config] Set overwrite_text to: " << value << std::endl;
+                }
             }
         } catch (const std::exception& e) {
             std::cerr << "[Config] JSON parse error: " << e.what() << std::endl;
         }
-        return std::string();
+        return {};
     };
 
     UnixSocketServer socketServer(
