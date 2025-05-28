@@ -26,7 +26,6 @@ GesturesRequester::GesturesRequester(int number_of_gestures,
     gesture_detector_->set_signal_trigger_callback([this](const std::string& label) {
         this->gesture_detected_callback(label);
     });
-
     ft_ = cv::freetype::createFreeType2();  // Initialize the FreeType2 object
     ft_->loadFontData(font_path, 0);        // Load the font data
 }
