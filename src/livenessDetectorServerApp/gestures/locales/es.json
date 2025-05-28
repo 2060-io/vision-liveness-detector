@@ -7,10 +7,10 @@
             "label": "Ok"
         },
         "notAlive": {
-            "label": "No estás vivo"
+            "label": ""
         },
         "youarealive": {
-            "label": "Estás vivo"
+            "label": ""
         },
         "blink": {
             "label": "parpadea tus ojos"

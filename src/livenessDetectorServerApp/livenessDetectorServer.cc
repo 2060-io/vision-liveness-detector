@@ -36,6 +36,8 @@ int main(int argc, char** argv) {
     // Initialize callback_data_ as a JSON object
     json callback_data_json;
 
+    std::string warning_message = "";
+
     // Load gesture definitions from JSON files.
     std::vector<std::string> gestureFiles;
 
@@ -131,11 +133,10 @@ int main(int argc, char** argv) {
     });
 
     // Create a UnixSocketServer using the provided socket path.
-    auto imageProcessingCallback = [&requester, &processor, &callback_data_json](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
+    auto imageProcessingCallback = [&requester, &processor, &callback_data_json, &warning_message](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
         processor.ProcessImage(inputImage);
 
         std::unordered_map<std::string, double> npoints;  // empty points; extend as needed!
-        std::string warning_message = "";
         cv::Mat processedImage = requester.process_image(inputImage, 0, npoints, warning_message);
 
         // Serialize the accumulated JSON object to a string
@@ -144,8 +145,38 @@ int main(int argc, char** argv) {
 
         return {processedImage, callback_data};
     };
+ 
+    auto dataProcessingCallback = [&warning_message, &requester](const std::string& json_str) -> std::string {
+        try {
+            auto j = nlohmann::json::parse(json_str);
+    
+            // Check all required fields before proceeding
+            if (j.contains("action") && j["action"] == "set" &&
+                j.contains("variable") && j["variable"].is_string() &&
+                j.contains("value") && j["value"].is_string())
+            {
+                const std::string& variable = j["variable"];
+                const std::string& value = j["value"];
+    
+                if (variable == "warning_message") {
+                    warning_message = value;
+                    std::cout << "[Config] Set warning_message to: " << warning_message << std::endl;
+                } else if (variable == "overwrite_text") {
+                    requester.set_overwrite_text(value);
+                    std::cout << "[Config] Set overwrite_text to: " << value << std::endl;
+                }
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[Config] JSON parse error: " << e.what() << std::endl;
+        }
+        return {};
+    };
 
-    UnixSocketServer socketServer(socket_path, imageProcessingCallback);
+    UnixSocketServer socketServer(
+        socket_path, 
+        imageProcessingCallback,
+        dataProcessingCallback
+    );
 
     if (!socketServer.start()) {
         std::cerr << "Failed to start UnixSocketServer.\n";

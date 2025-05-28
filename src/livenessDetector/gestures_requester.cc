@@ -26,7 +26,6 @@ GesturesRequester::GesturesRequester(int number_of_gestures,
     gesture_detector_->set_signal_trigger_callback([this](const std::string& label) {
         this->gesture_detected_callback(label);
     });
-    
     ft_ = cv::freetype::createFreeType2();  // Initialize the FreeType2 object
     ft_->loadFontData(font_path, 0);        // Load the font data
 }
@@ -66,7 +65,7 @@ cv::Mat GesturesRequester::process_image(cv::Mat img,
     }
     
     if (!warning_message.empty()) {
-        add_text_with_freetype(ft_, img_out, warning_message, 10, cv::Scalar(0, 255, 255));
+        add_text_with_freetype(ft_, img_out, warning_message, 80, cv::Scalar(0, 255, 255));
     }
     
     return img_out;

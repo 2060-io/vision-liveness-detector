@@ -6,3 +6,5 @@ __pycache__
 wrappers/python/liveness_detector/server
 wrappers/python/liveness_detector/gestures
 wrappers/python/liveness_detector/*.json
+.venv
+tmp

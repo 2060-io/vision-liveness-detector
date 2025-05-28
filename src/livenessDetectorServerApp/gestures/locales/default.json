@@ -4,10 +4,10 @@
             "label": "Starting"
         },
         "notAlive": {
-            "label": "You are not alive"
+            "label": ""
         },
         "youarealive": {
-            "label": "You are alive"
+            "label": ""
         },
         "ok": {
             "label": "Ok"

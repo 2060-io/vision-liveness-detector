@@ -98,6 +98,34 @@ class GestureServerClient:
             self.stop_server()
             return False
 
+    def set_overwrite_text(self, text):
+        """ Send a command to the server to set the overwrite text. """
+        if self.client_socket is None:
+            raise RuntimeError("Server not started or connection failed.")
+        message = {
+            "action": "set",
+            "variable": "overwrite_text",
+            "value": text
+        }
+        data = json.dumps(message).encode('utf-8')
+        self.client_socket.sendall((0x02).to_bytes(1, 'big'))
+        self.client_socket.sendall(len(data).to_bytes(4, 'big'))
+        self.client_socket.sendall(data)
+    
+    def set_warning_message(self, text):
+        """ Send a command to the server to set the warning message. """
+        if self.client_socket is None:
+            raise RuntimeError("Server not started or connection failed.")
+        message = {
+            "action": "set",
+            "variable": "warning_message",
+            "value": text
+        }
+        data = json.dumps(message).encode('utf-8')
+        self.client_socket.sendall((0x02).to_bytes(1, 'big'))
+        self.client_socket.sendall(len(data).to_bytes(4, 'big'))
+        self.client_socket.sendall(data)
+    
     def process_frame(self, frame):
         """ Send a frame to the server and receive the processed frame. """
         if self.client_socket is None:
