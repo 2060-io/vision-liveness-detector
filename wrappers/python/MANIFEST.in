@@ -7,6 +7,9 @@ include ../../LICENSE
 # Include model task
 include ./liveness_detector/model/face_landmarker.task
 
+#include default font
+include ./liveness_detector/fonts/DejaVuSans.ttf
+
 # Include all files in the livenessDetectorServerApp/gestures directory, recursively
 recursive-include ./liveness_detector/gestures *
 

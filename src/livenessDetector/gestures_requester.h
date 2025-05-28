@@ -1,6 +1,7 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+#include <opencv2/freetype.hpp>
 #include <vector>
 #include <string>
 #include <functional>
@@ -37,9 +38,10 @@ public:
     };
 
     GesturesRequester(int number_of_gestures,
-                     GestureDetector* gesture_detector,
-                     TranslationManager* translator,
-                     DebugLevel debug_level = DebugLevel::OFF);
+                      GestureDetector* gesture_detector,
+                      TranslationManager* translator,
+                      const std::string& font_path,
+                      DebugLevel debug_level = DebugLevel::OFF);
     
     ~GesturesRequester();
 
@@ -76,6 +78,7 @@ private:
     uint64_t current_gesture_started_at_; // milliseconds since epoch
     bool start_time_;
     GestureRequest* current_gesture_request_;
+    cv::Ptr<cv::freetype::FreeType2> ft_;
     
     std::function<void(bool)> report_alive_callback_;
     std::function<void()> ask_to_take_picture_callback_;
@@ -102,6 +105,22 @@ private:
                                        double font_scale,
                                        int thickness,
                                        int margin = 10);
+    
+    void add_text_with_freetype(cv::Ptr<cv::freetype::FreeType2> ft2,
+                                cv::Mat& image,
+                                const std::string& text,
+                                double y_pos_percent=10.0,
+                                cv::Scalar text_color=cv::Scalar(255, 255, 255),
+                                cv::Scalar text_bg_color= cv::Scalar(0, 0, 0),
+                                int fontHeight=30);
+    
+    std::vector<std::string> split_text_freetype(
+                                        cv::Ptr<cv::freetype::FreeType2> ft2,
+                                        const std::string& text,
+                                        int image_width,
+                                        int font_height,
+                                        int thickness,
+                                        int margin);
     
     std::pair<std::string, cv::Mat> process_requests();
 };
