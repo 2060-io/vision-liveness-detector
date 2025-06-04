@@ -23,6 +23,7 @@ namespace fs = std::filesystem;
 // Returns an empty string if OK, otherwise a warning message.
 std::string verify_correct_face(
     const std::map<std::string, float>& face_square_normalized_points,
+    TranslationManager* translator,
     bool glasses = false,
     float percentage_min_face_width = 0.1f,
     float percentage_max_face_width = 0.5f,
@@ -30,12 +31,11 @@ std::string verify_correct_face(
     float percentage_max_face_height = 0.7f,
     float percentage_center_allowed_offset = 0.25f
 ) {
-    // Warning messages as per FaceConfig
-    const std::string wrong_face_width_message = "Face width is not in the correct range.";
-    const std::string wrong_face_height_message = "Face height is not in the correct range.";
-    const std::string wrong_face_center_message = "Face center is not in the correct position.";
-    const std::string face_not_detected_message = "Face detection failed. Check lighting conditions.";
-    const std::string face_with_glasses_message = "You are using glasses, please remove them.";
+    const std::string wrong_face_width_message   = translator->translate("warning.wrong_face_width_message");
+    const std::string wrong_face_height_message  = translator->translate("warning.wrong_face_height_message");
+    const std::string wrong_face_center_message  = translator->translate("warning.wrong_face_center_message");
+    const std::string face_not_detected_message  = translator->translate("warning.face_not_detected_message");
+    const std::string face_with_glasses_message  = translator->translate("warning.face_with_glasses_message");
 
     // 1. Check if points exist
     const char* required_keys[] = {"Top Square", "Left Square", "Right Square", "Bottom Square"};
@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
     // Create a FaceProcessor
     FaceProcessor processor(model_path);
     processor.SetDoProcessImage(true);
-    processor.SetCallback([&detector, &warning_message](const std::map<std::string, float>& blendshapes,
+    processor.SetCallback([&detector, &warning_message, &translator](const std::map<std::string, float>& blendshapes,
         const std::map<std::string, float>& transformationValues) {
             // Create an unordered_map to hold the converted blendshapes
             std::unordered_map<std::string, double> convertedBlendshapes;
@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
             }
             // Call process_signals with the converted map
             detector.process_signals(convertedBlendshapes);
-            warning_message = verify_correct_face(transformationValues);
+            warning_message = verify_correct_face(transformationValues, &translator);
     });
 
     // Create a UnixSocketServer using the provided socket path.
