@@ -9,6 +9,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <map>
 #include <unordered_map>
 #include <filesystem>
 #include <functional>
@@ -17,6 +18,71 @@
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
+
+// Function to verify if the detected face satisfies all constraints.
+// Returns an empty string if OK, otherwise a warning message.
+std::string verify_correct_face(
+    const std::map<std::string, float>& face_square_normalized_points,
+    bool glasses = false,
+    float percentage_min_face_width = 0.1f,
+    float percentage_max_face_width = 0.5f,
+    float percentage_min_face_height = 0.1f,
+    float percentage_max_face_height = 0.7f,
+    float percentage_center_allowed_offset = 0.25f
+) {
+    // Warning messages as per FaceConfig
+    const std::string wrong_face_width_message = "Face width is not in the correct range.";
+    const std::string wrong_face_height_message = "Face height is not in the correct range.";
+    const std::string wrong_face_center_message = "Face center is not in the correct position.";
+    const std::string face_not_detected_message = "Face detection failed. Check lighting conditions.";
+    const std::string face_with_glasses_message = "You are using glasses, please remove them.";
+
+    // 1. Check if points exist
+    const char* required_keys[] = {"Top Square", "Left Square", "Right Square", "Bottom Square"};
+    for (const auto& key : required_keys) {
+        if (face_square_normalized_points.find(key) == face_square_normalized_points.end()) {
+            return face_not_detected_message;
+        }
+    }
+
+    // 2. Glasses check
+    if (glasses) {
+        return face_with_glasses_message;
+    }
+
+    // 3. Get coords
+    float topSquare    = face_square_normalized_points.at("Top Square");
+    float leftSquare   = face_square_normalized_points.at("Left Square");
+    float rightSquare  = face_square_normalized_points.at("Right Square");
+    float bottomSquare = face_square_normalized_points.at("Bottom Square");
+
+    // Quick fail if not valid detection
+    if (topSquare < 0 || leftSquare < 0 || rightSquare < 0 || bottomSquare < 0) {
+        return face_not_detected_message;
+    }
+
+    // 4. Face width/height, center
+    float face_width  = rightSquare - leftSquare;
+    float face_height = bottomSquare - topSquare;
+    float face_center_x = (rightSquare + leftSquare) / 2.0f;
+    float face_center_y = (topSquare    + bottomSquare) / 2.0f;
+
+    // 5. Checks
+    if (!(percentage_min_face_width <= face_width && face_width <= percentage_max_face_width)) {
+        return wrong_face_width_message;
+    }
+    if (!(percentage_min_face_height <= face_height && face_height <= percentage_max_face_height)) {
+        return wrong_face_height_message;
+    }
+    float center = 0.5f;
+    if (!(center - percentage_center_allowed_offset <= face_center_x && face_center_x <= center + percentage_center_allowed_offset) ||
+        !(center - percentage_center_allowed_offset <= face_center_y && face_center_y <= center + percentage_center_allowed_offset)) {
+        return wrong_face_center_message;
+    }
+
+    // OK!
+    return "";
+}
 
 int main(int argc, char** argv) {
     if (argc != 7) {
@@ -120,7 +186,7 @@ int main(int argc, char** argv) {
     // Create a FaceProcessor
     FaceProcessor processor(model_path);
     processor.SetDoProcessImage(true);
-    processor.SetCallback([&detector](const std::map<std::string, float>& blendshapes,
+    processor.SetCallback([&detector, &warning_message](const std::map<std::string, float>& blendshapes,
         const std::map<std::string, float>& transformationValues) {
             // Create an unordered_map to hold the converted blendshapes
             std::unordered_map<std::string, double> convertedBlendshapes;
@@ -130,6 +196,7 @@ int main(int argc, char** argv) {
             }
             // Call process_signals with the converted map
             detector.process_signals(convertedBlendshapes);
+            warning_message = verify_correct_face(transformationValues);
     });
 
     // Create a UnixSocketServer using the provided socket path.
