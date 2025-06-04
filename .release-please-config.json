@@ -1,0 +1,11 @@
+{
+  "branches": [
+    {
+      "branch": "main",
+      "releaseType": "python",
+      "bumpMinorPreMajor": true,
+      "bumpPatchForMinorPreMajor": true,
+      "prerelease": true
+    }
+  ]
+}

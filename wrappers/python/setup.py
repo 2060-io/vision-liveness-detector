@@ -3,9 +3,16 @@ import os
 import platform
 import sys
 
+from packaging.version import Version
+
+# Try to read version string from env variable
+# Default to 0.0.0.dev0 to allow for installs through `pip install -e .`
+version_string = os.environ.get("RELEASE_VERSION", "0.0.0.dev0")
+version = Version(version_string)
+
 setup(
     name='liveness_detector',
-    version='0.1.0',
+    version=str(version),
     description='Liveness detector server launcher with precompiled binaries',
     author='2060.io',
     author_email='r@2060.io',
