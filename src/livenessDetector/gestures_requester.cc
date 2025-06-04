@@ -21,13 +21,27 @@ GesturesRequester::GesturesRequester(int number_of_gestures,
       current_gesture_index_(0),
       current_gesture_started_at_(0),
       start_time_(false),
-      current_gesture_request_(nullptr) {
-    
+      current_gesture_request_(nullptr),
+      ft_(nullptr) // initialize as nullptr
+{
     gesture_detector_->set_signal_trigger_callback([this](const std::string& label) {
         this->gesture_detected_callback(label);
     });
-    ft_ = cv::freetype::createFreeType2();  // Initialize the FreeType2 object
-    ft_->loadFontData(font_path, 0);        // Load the font data
+
+    // Check if the font file exists
+    if (std::filesystem::exists(font_path)) {
+        try {
+            ft_ = cv::freetype::createFreeType2(); // allocate instance
+            ft_->loadFontData(font_path, 0);       // try loading font
+        } catch (const cv::Exception& e) {
+            std::cerr << "Failed to load font: " << font_path << "\n"
+                      << e.what() << std::endl;
+            ft_ = nullptr; // loading failed
+        }
+    } else {
+        std::cerr << "Font file does not exist: " << font_path << std::endl;
+        ft_ = nullptr; // File does not exist
+    }
 }
 
 GesturesRequester::~GesturesRequester() {
@@ -59,13 +73,22 @@ cv::Mat GesturesRequester::process_image(cv::Mat img,
         text = overwrite_text_;
     }
     
-    add_text_with_freetype(ft_, img_out, text);
+    if (ft_ != nullptr){
+        add_text_with_freetype(ft_, img_out, text);
+    } else {
+        add_text_to_image(img_out, text);
+    }
+    
     if (!icon.empty()) {
         add_icon_to_image(img_out, icon, 550, 400);
     }
     
     if (!warning_message.empty()) {
-        add_text_with_freetype(ft_, img_out, warning_message, 80, cv::Scalar(0, 255, 255));
+        if (ft_ != nullptr){
+            add_text_with_freetype(ft_, img_out, warning_message, 80, cv::Scalar(0, 255, 255));
+        } else {
+            add_text_to_image(img_out, warning_message, 80, cv::Scalar(0, 255, 255));
+        }
     }
     
     return img_out;
