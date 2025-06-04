@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/2060-io/vision-liveness-detector/compare/v0.2.1...v0.3.0) (2025-06-04)
+
+
+### Features
+
+* default opencv fonts if requested font path is not found ([#10](https://github.com/2060-io/vision-liveness-detector/issues/10)) ([f609e4d](https://github.com/2060-io/vision-liveness-detector/commit/f609e4d5ec978aa3945de9273b1515de2f710b8c))
+
 ## [0.2.1](https://github.com/2060-io/vision-liveness-detector/compare/v0.2.0...v0.2.1) (2025-06-04)
 
 
