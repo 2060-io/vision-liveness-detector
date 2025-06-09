@@ -1,0 +1,35 @@
+name: Build and Push Builder image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+env:
+  DH_USERNAME: ${{ secrets.DOCKER_HUB_LOGIN }}
+  DH_TOKEN: ${{ secrets.DOCKER_HUB_PWD }}
+  IMAGE_NAME: vision-liveness-detector-build
+  IMAGE_TAG: manylinux_2_28_x86_64
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with: 
+          fetch-depth: 0  
+      
+      - name: Log in to Docker Hub
+        run: echo "$DH_TOKEN" | docker login -u "$DH_USERNAME" --password-stdin
+
+      - name: Build Docker Image
+        run: docker build -f Dockerfile.build.manylinux_2_28_x86_64 -t $DH_USERNAME/$IMAGE_NAME:$IMAGE_TAG .
+
+      - name: Push Docker Image to Docker Hub
+        run: |
+          docker push $DH_USERNAME/$IMAGE_NAME:$IMAGE_TAG

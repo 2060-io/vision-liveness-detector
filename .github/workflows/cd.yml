@@ -11,11 +11,6 @@ permissions:
   issues: write
   pull-requests: write
 
-env:
-  DH_USERNAME: ${{ secrets.DOCKER_HUB_LOGIN }}
-  DH_TOKEN: ${{ secrets.DOCKER_HUB_PWD }}
-  IMAGE_NAME: 'vision-service'
-
 jobs:
   release:
     runs-on: ubuntu-latest

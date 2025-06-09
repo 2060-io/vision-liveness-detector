@@ -1,80 +1,6 @@
-# Make a container for Liveness Detection with MediaPipe
-# Based on the official MediaPipe manylinux_2_28_x86_64 Dockerfile
+FROM io2060/vision-liveness-detector-build:manylinux_2_28_x86_64
 
-# Run with:
-# DOCKER_BUILDKIT=1 docker build -f Dockerfile.manylinux_2_28_x86_64 -t mediapipe_liveness_detector:latest --build-arg PYTHON_BIN=/opt/python/cp312-cp312/bin/python3.12 .
-FROM quay.io/pypa/manylinux_2_28_x86_64
-
-
-ARG MEDIAPIPE_DISABLE_GPU=1
-ENV MEDIAPIPE_DISABLE_GPU=${MEDIAPIPE_DISABLE_GPU}
-
-# Install system‐wide dependencies (incl. dev libraries)
-RUN yum update -y
-RUN yum install -y \
-    java-11-openjdk-devel \
-    zip wget curl unzip git patch cmake gcc-c++ make \
-    mesa-libGL mesa-libGL-devel mesa-libEGL mesa-libEGL-devel mesa-libGLES-devel \
-    epel-release emacs portaudio-devel \
-    libjpeg-turbo-devel libpng-devel libtiff-devel libwebp-devel \
-    openjpeg2-devel OpenEXR-devel zlib-devel freetype-devel harfbuzz-devel
-
-# Install Bazel 6.5.0
-WORKDIR /tmp/bazel_build
-ADD https://github.com/bazelbuild/bazel/releases/download/6.5.0/bazel-6.5.0-dist.zip bazel.zip
-RUN unzip bazel.zip
-RUN rm -f bazel.zip
-ENV PATH="/opt/python/cp36-cp36m/bin:${PATH}"
-ENV EXTRA_BAZEL_ARGS="--host_javabase=@local_jdk//:jdk"
-ENV BAZEL_LINKLIBS=-lm:-lstdc++
-RUN ./compile.sh
-RUN cp /tmp/bazel_build/output/bazel /bin/bazel
-
-
-# Install Clang 18
-RUN --mount=type=cache,target=/var/cache/dnf dnf install -y wget gcc-c++ && dnf clean all
-RUN mkdir /tmp/llvm-project && wget -qO - https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-18.1.8.tar.gz | tar -xz -C /tmp/llvm-project --strip-components 1 && \
-    mkdir /tmp/llvm-project/build && cd /tmp/llvm-project/build && cmake -DLLVM_ENABLE_PROJECTS='clang;lld' -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/lib/llvm-18/ ../llvm && \
-    make -j$(nproc) && make -j$(nproc) install && rm -rf /tmp/llvm-project
-
-# Copy Protobuf Compiler binary
-ARG PROTOC_ZIP=protoc-25.1-linux-x86_64.zip
-RUN curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v25.1/$PROTOC_ZIP
-RUN unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
-RUN unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
-RUN rm -f $PROTOC_ZIP
-
-# Install OpenCV.
-WORKDIR /tmp
-RUN git clone https://github.com/opencv/opencv.git
-RUN git clone https://github.com/opencv/opencv_contrib.git
-RUN mkdir opencv/release
-RUN cd opencv_contrib && git checkout 4.10.0
-RUN cd /tmp/opencv && git checkout 4.10.0 && cd release && cmake .. \
-    -DCMAKE_C_COMPILER=/usr/lib/llvm-18/bin/clang \
-    -DCMAKE_CXX_COMPILER=/usr/lib/llvm-18/bin/clang++ \
-    -DWITH_FREETYPE=ON \
-    -DOPENCV_ENABLE_NONFREE=ON \
-    -DCMAKE_BUILD_TYPE=RELEASE \
-    -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DOPENCV_EXTRA_MODULES_PATH=/tmp/opencv_contrib/modules \
-    -DWITH_OPENEXR=ON \
-    -DWITH_ITT=OFF -DWITH_IPP=OFF \
-    -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF \
-    -DBUILD_opencv_ts=OFF \
-    -DCV_ENABLE_INTRINSICS=ON -DWITH_EIGEN=ON \
-    -DWITH_PTHREADS=ON -DWITH_PTHREADS_PF=ON
-RUN cd /tmp/opencv/release && make -j$(nproc) && make install
-
-COPY . /livenessDetector/
-WORKDIR /livenessDetector
-
-RUN ./setup_for_build.sh
-RUN cd build/mediapipe/ && echo "build --client_env=CC=/usr/lib/llvm-18/bin/clang++" >> .bazelrc && \
-    echo "build --define=xnn_enable_avxvnniint8=false" >> .bazelrc && \
-    echo "build --define=MEDIAPIPE_DISABLE_GPU=1" >> .bazelrc && \
-    echo 'cc_library(name = "opencv", srcs = [ "local/lib64/libopencv_core.a", "local/lib64/libopencv_imgproc.a", "local/lib64/libopencv_highgui.a", "local/lib64/libopencv_video.a", "local/lib64/libopencv_videoio.a", "local/lib64/libopencv_imgcodecs.a", "local/lib64/libopencv_freetype.a"], hdrs = glob(["local/include/opencv4/opencv2/**/*.h*"]), includes = ["local/include/opencv4/"], linkstatic = 1, linkopts = [ "-ljpeg", "-lpng", "-lz", "-ltiff", "-lwebp", "-lopenjp2", "-lIlmImf", "-lImath", "-lHalf", "-lIex", "-lIexMath", "-lIlmThread", "-lfreetype", "-lharfbuzz"], visibility = ["//visibility:public"], )' > third_party/opencv_linux.BUILD
+ARG RELEASE_VERSION="0.0.1-dev.0"
 
 # Set the environment variable for your Python binary (optional)
 ENV PYTHON_BIN=/opt/python/cp312-cp312/bin/python3.12
@@ -99,5 +25,5 @@ RUN $PYTHON_BIN -m pip install wheel auditwheel
 RUN ln -sf $PYTHON_BIN /usr/bin/python && \
     ln -sf $PYTHON_BIN /usr/bin/python3
 
-RUN cd ./wrappers/python && $PYTHON_BIN setup.py bdist_wheel --python-tag=py3 --plat-name=manylinux2014_x86_64
+RUN cd ./wrappers/python && RELEASE_VERSION=${RELEASE_VERSION} $PYTHON_BIN setup.py bdist_wheel --python-tag=py3 --plat-name=manylinux2014_x86_64
 
