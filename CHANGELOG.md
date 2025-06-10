@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/2060-io/vision-liveness-detector/compare/v0.3.0...v0.4.0) (2025-06-10)
+
+
+### Features
+
+* face constraints warnings ([#14](https://github.com/2060-io/vision-liveness-detector/issues/14)) ([c2660be](https://github.com/2060-io/vision-liveness-detector/commit/c2660be5b2592ad3c1520c5b24ac1ae25049cbb9))
+
 ## [0.3.0](https://github.com/2060-io/vision-liveness-detector/compare/v0.2.1...v0.3.0) (2025-06-04)
 
 
