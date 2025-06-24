@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
 
     // List of required argument names (without leading "--" since parse_args strips it)
     std::vector<std::string> required_keys = {
-        "model_path", "gestures_folder_path", "language", "socket_path", "num_gestures", "font_path"
+        "--model_path", "--gestures_folder_path", "--language", "--socket_path", "--num_gestures", "--font_path"
     };
 
     bool missing = false;
@@ -141,7 +141,6 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    // Example: retrieving arguments:
     std::string model_path = args["--model_path"];
     std::string gestures_folder_path = args["--gestures_folder_path"];
     std::vector<std::string> gestures_folders = split_paths(gestures_folder_path);
