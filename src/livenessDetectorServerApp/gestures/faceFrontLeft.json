@@ -1,5 +1,5 @@
 {
-    "gestureId": "smile",
+    "gestureId": "faceFrontLeft",
     "label": "Keep your head upright, then incline it to the left, then return to the front",
     "icon_path": "./gestures/icons/sample.png",
     "signal_key": "eyeLookInLeft",
