@@ -20,6 +20,30 @@
         },
         "smile": {
             "label": "Smile and then Serious"
+        },
+        "downup": {
+            "label": "Look DOWN, UP and front"
+        },
+        "eyesDownwards": {
+            "label": "Look at the camera, then LOWER your EYES, then return to the camera"
+        },
+        "eyesShiftLeft": {
+            "label": "Look at the camera, then shift your EYES to the LEFT , then return to the camera"
+        },
+        "eyesShiftRight": {
+            "label": "Look at the camera, then shift your EYES to the RIGHT , then return to the camera"
+        },
+        "eyesUpwards": {
+            "label": "Look at the camera, then RAISE your EYES, then return to the camera"
+        },
+        "faceFrontLeft": {
+            "label": "Keep your head upright, then incline it to the left, then return to the front"
+        },
+        "faceFrontRight": {
+            "label": "Keep your head upright, then incline it to the right, then return to the front"
+        },
+        "updown": {
+            "label": "Look UP, DOWN and front"
         }
     },
     "error": {

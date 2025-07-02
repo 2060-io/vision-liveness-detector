@@ -13,13 +13,37 @@
             "label": ""
         },
         "blink": {
-            "label": "parpadea tus ojos"
+            "label": "Parpadea tus ojos"
         },
         "openCloseMouth": {
             "label": "Abre y cierra la boca"
         },
         "smile": {
             "label": "Sonríe"
+        },
+        "downup": {
+            "label": "Mira ABAJO, ARRIBA y al frente"
+        },
+        "eyesDownwards": {
+            "label": "Mira a la cámara, luego BAJA los OJOS, luego vuelve a la cámara"
+        },
+        "eyesShiftLeft": {
+            "label": "Mira a la cámara, luego dirige tus OJOS a la IZQUIERDA, luego vuelve a la cámara"
+        },
+        "eyesShiftRight": {
+            "label": "Mira a la cámara, luego dirige tus OJOS a la DERECHA, luego vuelve a la cámara"
+        },
+        "eyesUpwards": {
+            "label": "Mira a la cámara, luego SUBE los OJOS, luego vuelve a la cámara"
+        },
+        "faceFrontLeft": {
+            "label": "Mantén tu cabeza recta, luego inclínala a la izquierda, luego vuelve al frente"
+        },
+        "faceFrontRight": {
+            "label": "Mantén tu cabeza recta, luego inclínala a la derecha, luego vuelve al frente"
+        },
+        "updown": {
+            "label": "Mira ARRIBA, ABAJO y al frente"
         }
     },
     "error": {
