@@ -46,16 +46,24 @@ Both user types can add gestures and languages—see below.
 
 ## For Python Users — Install & Use
 
-Note: The PyPI/package wheel currently works on Linux only; Windows/macOS support coming soon.
+### 1. Install via PyPI
 
-### 1. Install via pip (Linux only for now)
-```bash
-pip install liveness_detector
-```
-Or, after building from source:  
+> **✨ Now on [PyPI](https://pypi.org/project/liveness-detector/)! ✨**  
+> You can install the liveness detector with:
+>
+> ```bash
+> pip install liveness-detector
+> ```
+>
+> _Note: The package is currently distributed with Linux wheels only; Windows/macOS support is coming soon!_
+
+If you need to install from a built wheel after compiling from source:
+
 ```bash
 pip install wrappers/python/dist/liveness_detector-*.whl
 ```
+
+---
 
 ### 2. Minimal Video Usage Example (Webcam Integration)
 
@@ -109,6 +117,7 @@ You can further use callbacks (see [example_run.py](wrappers/python/tests/exampl
 ## Custom Gestures and Translations
 
 ### Add Gestures / Languages at Runtime
+
 You can pass extra gesture directories or translation files when constructing the Python `GestureServerClient`:
 
 ```python
@@ -122,9 +131,9 @@ server_client = GestureServerClient(
 )
 ```
 
-- extra_gestures_paths: List of folders with additional gesture JSONs.
-- extra_locales_paths: List of folders with more translation JSONs.
-- gestures_list: (Optional) List of gesture names to permit for this session.
+- `extra_gestures_paths`: List of folders with additional gesture JSONs.
+- `extra_locales_paths`: List of folders with more translation JSONs.
+- `gestures_list`: (Optional) List of gesture names to permit for this session.
 
 These correspond internally to `--gestures_folder_path`, `--locales_paths`, and `--gestures_list` parameters for the C++ server.
 
