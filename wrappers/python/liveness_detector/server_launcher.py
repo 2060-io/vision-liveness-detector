@@ -22,7 +22,15 @@ def get_server_executable_path():
         sys.exit(f"Unsupported platform: {system} {machine}")
 
 class GestureServerClient:
-    def __init__(self, language, socket_path, num_gestures):
+    def __init__(
+        self, 
+        language, 
+        socket_path, 
+        num_gestures, 
+        extra_gestures_paths=None, 
+        extra_locales_paths=None, 
+        gestures_list=None
+    ):
         self.server_executable_path = os.path.join(os.path.dirname(__file__), get_server_executable_path())
         self.model_path = os.path.join(os.path.dirname(__file__),'./model/face_landmarker.task')
         self.gestures_folder_path = os.path.join(os.path.dirname(__file__),'./gestures')
@@ -30,6 +38,12 @@ class GestureServerClient:
         self.language = language
         self.socket_path = socket_path
         self.num_gestures = num_gestures
+
+        # New parameters, default to empty list if not provided
+        self.extra_gestures_paths = extra_gestures_paths if extra_gestures_paths else []
+        self.extra_locales_paths = extra_locales_paths if extra_locales_paths else []
+        self.gestures_list = gestures_list if gestures_list else []
+
         self.server_process = None
         self.client_socket = None
         self.string_callback = None
@@ -65,17 +79,38 @@ class GestureServerClient:
         """ Start the server process. """
         self.cleanup_socket()
 
+        # Compose gestures_folder_path for argument (main + extras)
+        all_gesture_paths = [self.gestures_folder_path] + self.extra_gestures_paths
+        gestures_folder_arg = ':'.join(all_gesture_paths)
+
+        # Compose locales_paths (if any)
+        locales_paths_arg = None
+        if self.extra_locales_paths:
+            locales_paths_arg = ':'.join(self.extra_locales_paths)
+
+        # Compose gestures_list (if any)
+        gestures_list_arg = None
+        if self.gestures_list:
+            gestures_list_arg = ':'.join(self.gestures_list)
+
+        # Build command with argument names ('--...')
         server_command = [
             self.server_executable_path,
-            self.model_path,
-            self.gestures_folder_path,
-            self.language,
-            self.socket_path,
-            str(self.num_gestures),
-            self.font_path
+            "--model_path", self.model_path,
+            "--gestures_folder_path", gestures_folder_arg,
+            "--language", self.language,
+            "--socket_path", self.socket_path,
+            "--num_gestures", str(self.num_gestures),
+            "--font_path", self.font_path,
         ]
 
-        print("Launching server...")
+        # Add optional arguments
+        if locales_paths_arg:
+            server_command.extend(["--locales_paths", locales_paths_arg])
+        if gestures_list_arg:
+            server_command.extend(["--gestures_list", gestures_list_arg])
+
+        print("Launching server with:", " ".join(server_command))
         self.server_process = subprocess.Popen(server_command)
 
         start_time = time.time()

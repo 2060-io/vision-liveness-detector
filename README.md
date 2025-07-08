@@ -1,90 +1,267 @@
-# Liveness Detector
+# Gesture-based Facial Liveness Detector
 
-## Overview
+by [2060.io](https://2060.io) — Secure, customizable, open-source liveness detection with randomized facial gestures and real-time computer vision.
 
-Liveness Detector is a project designed to detect user liveness, leveraging a server-based architecture to process data via a Python launcher. The project integrates with the MediaPipe framework for advanced media processing capabilities.
+---
+
+![Demo Screenshot](docs/Screenshot_sm.png)
+
+---
+
+## About 2060.io
+
+2060.io builds open-source tools for creating rich, decentralized, chat-powered services.
+We enable next-generation authentication, messaging, and Verifiable Credentials workflows—combining text, images, video, voice, and biometric authentication, all underpinned by privacy, interoperability, and the power of self-sovereign identity.
+
+- Verifiable Credentials & Authentic Data  
+    Our open-source tech lets you issue, verify, and use trustworthy credentials that embed OpenID for Verifiable Credentials, and DIDComm-based auditable chat messaging.
+    Easily compose anonymous, decentralized, and interoperable services using our [service agent](https://github.com/2060-io/2060-service-agent) (built atop OpenWallet Credo TS).
+    Deliver and verify anything—from identity cards and badges to graduation certificates and more.
+
+- Biometric Authentication you can trust  
+    This Liveness Detector verifies a real human presence and compares faces against the embedded photos in verifiable credentials, increasing security for all decentralized applications.
+
+---
+
+## Project Overview
+
+The Liveness Detector enables reliable human presence verification using randomized facial gesture challenges.  
+Unlike traditional face checks, this system prompts users for live gestures (blink, smile, head turn, etc.), fighting replay and spoof attacks.
+
+- Fast: C++/MediaPipe core, controlled from Python.
+- Flexible: Add gestures/locales with JSON.
+- User-friendly: Minimal Python code, easy to customize.
+- Extensible: For both production users and contributors.
+
+---
+
+## Who Is This For?
+
+- Python Users: Want a plug-and-play library via pip to add liveness to their app or workflow (including support for custom gestures and translations).
+- Contributors/Developers: Want to build from source, enhance or hack the C++ backend, or submit improvements.
+
+Both user types can add gestures and languages—see below.
+
+---
+
+## For Python Users — Install & Use
+
+### 1. Install via PyPI
+
+> **✨ Now on [PyPI](https://pypi.org/project/liveness-detector/)! ✨**  
+> You can install the liveness detector with:
+>
+> ```bash
+> pip install liveness-detector
+> ```
+>
+> _Note: The package is currently distributed with Linux wheels only; Windows/macOS support is coming soon!_
+
+If you need to install from a built wheel after compiling from source:
+
+```bash
+pip install wrappers/python/dist/liveness_detector-*.whl
+```
+
+---
+
+### 2. Minimal Video Usage Example (Webcam Integration)
+
+This script captures video frames from the webcam, processes them, and displays real-time liveness feedback:
+
+```python
+import cv2
+from liveness_detector.server_launcher import GestureServerClient
+
+def string_callback(message):
+    print(f"Message: {message}")
+
+def report_alive_callback(alive):
+    print(f"Liveness result: {'ALIVE' if alive else 'NOT ALIVE'}")
+
+def main():
+    server_client = GestureServerClient(
+        language='en',
+        socket_path='/tmp/liveness_socket',
+        num_gestures=2
+    )
+    server_client.set_string_callback(string_callback)
+    server_client.set_report_alive_callback(report_alive_callback)
+
+    if server_client.start_server():
+        cap = cv2.VideoCapture(0)  # Start webcam
+        try:
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                processed = server_client.process_frame(frame)
+                if processed is not None:
+                    cv2.imshow("Liveness Detector", processed)
+
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+        finally:
+            cap.release()
+            cv2.destroyAllWindows()
+            server_client.stop_server()
+
+if __name__ == "__main__":
+    main()
+```
+You can further use callbacks (see [example_run.py](wrappers/python/tests/example_run.py)) to save images or trigger custom actions.
+
+---
+
+## Custom Gestures and Translations
+
+### Add Gestures / Languages at Runtime
+
+You can pass extra gesture directories or translation files when constructing the Python `GestureServerClient`:
+
+```python
+server_client = GestureServerClient(
+    language='es',
+    socket_path='/tmp/liveness_socket',
+    num_gestures=2,
+    extra_gestures_paths=['/path/to/my_custom_gestures'],
+    extra_locales_paths=['/path/to/my_custom_locales'],
+    gestures_list=['blink', 'openCloseMouth']
+)
+```
+
+- `extra_gestures_paths`: List of folders with additional gesture JSONs.
+- `extra_locales_paths`: List of folders with more translation JSONs.
+- `gestures_list`: (Optional) List of gesture names to permit for this session.
+
+These correspond internally to `--gestures_folder_path`, `--locales_paths`, and `--gestures_list` parameters for the C++ server.
+
+Example custom gesture:
+```json
+{
+    "gestureId": "blink",
+    "label": "Blink your eyes",
+    "signal_key": "eyeBlinkLeft",
+    "instructions": [
+        {"move_to_next_type": "lower", "value": 0.35, "reset": {"type": "timeout_after_ms", "value": 10000}}
+    ]
+}
+```
+See [src/livenessDetectorServerApp/gestures/blink.json](src/livenessDetectorServerApp/gestures/blink.json) for a reference.
+
+Example custom locale (for Spanish):
+```json
+{
+    "gestures": {
+        "blink": {"label": "Parpadea"}
+    },
+    "warning": {
+        "wrong_face_width_message": "El ancho de la cara no es correcto."
+    }
+}
+```
+Just place your custom JSON files in extra directories and reference them as shown above.
+
+---
+
+## Architecture
+
+```text
+Your Python App
+    │
+    ▼
+[Liveness Detector Python Wrapper]
+    │
+    ▼   (Unix Socket IPC: frames, commands, responses)
+[C++ Liveness Detector Server]
+    │
+    ▼
+[MediaPipe / Face Landmarker]
+```
+- The Python wrapper launches and talks to the server transparently.
+- Custom gestures/locales are picked up as configured.
+- Responses, instructions, overlays, and result events all flow through the Python API.
+
+---
 
 ## Features
 
-- Provides a Python interface to launch and manage the liveness detection server.
-- Includes precompiled binaries for server operation.
-- Uses MediaPipe for robust and efficient media processing.
+- Challenge-Based Liveness: Random gestures defeat spoofing and replay.
+- Real-Time Response: MediaPipe and C++ for instant feedback, smooth overlays.
+- Pluggable Gestures and Languages: Just add JSON, no code required.
+- Python-First: Drop-in camera pipelines with only a few lines.
+- Extensible for Power Users: Add pipeline steps, new models, or UI feedback.
 
-## Setup and Installation
+---
 
-### Requirements
+## Example Use Cases
 
-- Docker with BUILDKIT enabled must be installed and running on your system.
-- Python 3.6 or above (up to 3.12) for using the generated wheel.
+- Decentralized KYC/client onboarding: Stop fake users and verify real human presence before issuing credentials.
+- Remote proctoring for online exams: Ensure test-taker presence.
+- Digital signature and credential session verification: Make sure the signer is truly present and matches credential data.
+- AR/VR "are you present?" checks: Detect real humans in immersive environments.
+- Fraud prevention and access control: Augment authentication and reduce risk of replay attacks.
 
-### Build
+---
 
-To build the Python wheel, simply run:
+## For Contributors and Developers — Build and Extend
+
+### 1. Build From Source
 
 ```bash
+git clone https://github.com/2060-io/vision-liveness-detector.git
+cd vision-liveness-detector
 ./build.sh
+pip install wrappers/python/dist/liveness_detector-*.whl
 ```
+Requires Docker and BUILDKIT on Linux.
 
-This will use the provided `Dockerfile.manylinux_2_28_x86_64` to build the project inside a Docker container. After the build completes, the Python wheel file will be generated at:
+### 2. Direct C++ Server Usage
 
-```
-wrappers/python/dist/liveness_detector-0.1.0-py3-none-manylinux2014_x86_64.whl
-```
-
-### Publish
-
-To publish the generated wheel to PyPI, use:
+You can run the C++ server binary standalone for integration with any client:
 
 ```bash
-./publish.sh
+livenessDetectorServer \
+    --model_path path/to/model \
+    --gestures_folder_path path/to/gestures \
+    --language en \
+    --socket_path /tmp/liveness.sock \
+    --num_gestures 2 \
+    --font_path path/to/DejaVuSans.ttf
+    # --locales_paths and --gestures_list also supported
 ```
 
-This script uses `twine` to upload all files in `wrappers/python/dist/` to the Python Package Index (PyPI). You must have a valid PyPI account and credentials configured (typically via a `~/.pypirc` file or environment variables) before running the script.
+### 3. How to Extend Internals
 
-After publishing, anyone can install the package directly from PyPI using:
+- Modify gesture logic, detection thresholds, draw overlays, etc. in C++.
+- Contribute on GitHub; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```bash
-pip install liveness_detector
-```
+---
 
-## Usage
+## Security and Privacy
 
-After building, you can install the Python package in two ways:
+- All processing local by default.
+- Open source: audit and improve as you wish.
+- Randomization ensures every session is unique.
 
-- **Install the locally built wheel:**
+---
 
-    ```bash
-    pip install wrappers/python/dist/liveness_detector-0.1.0-py3-none-manylinux2014_x86_64.whl
-    ```
+## Contributing to the 2060.io Ecosystem
 
-- **Install from PyPI (after publishing):**
+Pull requests, issues, and gesture/locale files are welcome.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for developer workflow or reach out to learn more about our community.
+Want to build Verifiable Credential and DIDComm services? Explore our agent framework: [2060-service-agent](https://github.com/2060-io/2060-service-agent).
 
-    ```bash
-    pip install liveness_detector
-    ```
-
-You can then launch the liveness detector server using the Python launcher:
-
-```bash
-liveness-detector-launcher
-```
-
-## Example
-
-The repository includes an example usage script to demonstrate how to utilize the server:
-
-```bash
-python example_run.py
-```
-
-## Contributing
-
-Contributions are welcome! Please fork the repository and use a feature branch. Pull requests are warmly welcome.
+---
 
 ## License
 
-This project is licensed under the GNU AFFERO GENERAL PUBLIC LICENSE - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the [GNU Affero General Public License](LICENSE).
 
-## Contact
+---
 
-For issues, please open an issue via the repository's issue tracker.
+## Contact and Support
+
+- [GitHub Issues](https://github.com/2060-io/vision-liveness-detector/issues)
+- Learn more: [https://2060.io](https://2060.io)
