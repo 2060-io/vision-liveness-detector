@@ -4,22 +4,7 @@ by [2060.io](https://2060.io) — Secure, customizable, open-source liveness det
 
 ---
 
-![Demo Screenshot](docs/Screenshot_sm.png)
-
----
-
-## About 2060.io
-
-2060.io builds open-source tools for creating rich, decentralized, chat-powered services.
-We enable next-generation authentication, messaging, and Verifiable Credentials workflows—combining text, images, video, voice, and biometric authentication, all underpinned by privacy, interoperability, and the power of self-sovereign identity.
-
-- Verifiable Credentials & Authentic Data  
-    Our open-source tech lets you issue, verify, and use trustworthy credentials that embed OpenID for Verifiable Credentials, and DIDComm-based auditable chat messaging.
-    Easily compose anonymous, decentralized, and interoperable services using our [service agent](https://github.com/2060-io/2060-service-agent) (built atop OpenWallet Credo TS).
-    Deliver and verify anything—from identity cards and badges to graduation certificates and more.
-
-- Biometric Authentication you can trust  
-    This Liveness Detector verifies a real human presence and compares faces against the embedded photos in verifiable credentials, increasing security for all decentralized applications.
+![Demo Screenshot](https://raw.githubusercontent.com/2060-io/vision-liveness-detector/refs/heads/main/docs/Screenshot_sm.png)
 
 ---
 
@@ -35,15 +20,6 @@ Unlike traditional face checks, this system prompts users for live gestures (bli
 
 ---
 
-## Who Is This For?
-
-- Python Users: Want a plug-and-play library via pip to add liveness to their app or workflow (including support for custom gestures and translations).
-- Contributors/Developers: Want to build from source, enhance or hack the C++ backend, or submit improvements.
-
-Both user types can add gestures and languages—see below.
-
----
-
 ## For Python Users — Install & Use
 
 ### 1. Install via PyPI
@@ -56,12 +32,6 @@ Both user types can add gestures and languages—see below.
 > ```
 >
 > _Note: The package is currently distributed with Linux wheels only; Windows/macOS support is coming soon!_
-
-If you need to install from a built wheel after compiling from source:
-
-```bash
-pip install wrappers/python/dist/liveness_detector-*.whl
-```
 
 ---
 
@@ -110,7 +80,7 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-You can further use callbacks (see [example_run.py](wrappers/python/tests/example_run.py)) to save images or trigger custom actions.
+You can further use callbacks to save images or trigger custom actions.
 
 ---
 
@@ -135,8 +105,6 @@ server_client = GestureServerClient(
 - `extra_locales_paths`: List of folders with more translation JSONs.
 - `gestures_list`: (Optional) List of gesture names to permit for this session.
 
-These correspond internally to `--gestures_folder_path`, `--locales_paths`, and `--gestures_list` parameters for the C++ server.
-
 Example custom gesture:
 ```json
 {
@@ -148,7 +116,6 @@ Example custom gesture:
     ]
 }
 ```
-See [src/livenessDetectorServerApp/gestures/blink.json](src/livenessDetectorServerApp/gestures/blink.json) for a reference.
 
 Example custom locale (for Spanish):
 ```json
@@ -161,27 +128,6 @@ Example custom locale (for Spanish):
     }
 }
 ```
-Just place your custom JSON files in extra directories and reference them as shown above.
-
----
-
-## Architecture
-
-```text
-Your Python App
-    │
-    ▼
-[Liveness Detector Python Wrapper]
-    │
-    ▼   (Unix Socket IPC: frames, commands, responses)
-[C++ Liveness Detector Server]
-    │
-    ▼
-[MediaPipe / Face Landmarker]
-```
-- The Python wrapper launches and talks to the server transparently.
-- Custom gestures/locales are picked up as configured.
-- Responses, instructions, overlays, and result events all flow through the Python API.
 
 ---
 
@@ -195,63 +141,11 @@ Your Python App
 
 ---
 
-## Example Use Cases
-
-- Decentralized KYC/client onboarding: Stop fake users and verify real human presence before issuing credentials.
-- Remote proctoring for online exams: Ensure test-taker presence.
-- Digital signature and credential session verification: Make sure the signer is truly present and matches credential data.
-- AR/VR "are you present?" checks: Detect real humans in immersive environments.
-- Fraud prevention and access control: Augment authentication and reduce risk of replay attacks.
-
----
-
-## For Contributors and Developers — Build and Extend
-
-### 1. Build From Source
-
-```bash
-git clone https://github.com/2060-io/vision-liveness-detector.git
-cd vision-liveness-detector
-./build.sh
-pip install wrappers/python/dist/liveness_detector-*.whl
-```
-Requires Docker and BUILDKIT on Linux.
-
-### 2. Direct C++ Server Usage
-
-You can run the C++ server binary standalone for integration with any client:
-
-```bash
-livenessDetectorServer \
-    --model_path path/to/model \
-    --gestures_folder_path path/to/gestures \
-    --language en \
-    --socket_path /tmp/liveness.sock \
-    --num_gestures 2 \
-    --font_path path/to/DejaVuSans.ttf
-    # --locales_paths and --gestures_list also supported
-```
-
-### 3. How to Extend Internals
-
-- Modify gesture logic, detection thresholds, draw overlays, etc. in C++.
-- Contribute on GitHub; see [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
 ## Security and Privacy
 
 - All processing local by default.
 - Open source: audit and improve as you wish.
 - Randomization ensures every session is unique.
-
----
-
-## Contributing to the 2060.io Ecosystem
-
-Pull requests, issues, and gesture/locale files are welcome.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for developer workflow or reach out to learn more about our community.
-Want to build Verifiable Credential and DIDComm services? Explore our agent framework: [2060-service-agent](https://github.com/2060-io/2060-service-agent).
 
 ---
 
