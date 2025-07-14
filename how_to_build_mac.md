@@ -161,4 +161,10 @@ bazel build --define MEDIAPIPE_DISABLE_GPU=1 //livenessDetectorServerApp:livenes
 The generated file will be located at:  
 `~/mediapipe_build/mediapipe_workspace/mediapipe/bazel-bin/livenessDetectorServerApp/livenessDetectorServer`
 
+## Step 10: Set the Path
+
+```bash
+export DYLD_LIBRARY_PATH=/your/opencv_local_install/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}
+```
+
 ---

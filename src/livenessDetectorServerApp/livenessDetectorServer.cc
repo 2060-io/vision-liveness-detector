@@ -8,6 +8,7 @@
 #include <opencv2/opencv.hpp> 
 #include <iostream>
 #include <vector>
+#include <set>
 #include <string>
 #include <map>
 #include <unordered_map>
@@ -84,18 +85,82 @@ std::string verify_correct_face(
     return "";
 }
 
+std::map<std::string, std::string> parse_args(int argc, char** argv) {
+    std::map<std::string, std::string> args;
+    for (int i = 1; i < argc; i+=2) {
+        if (std::string(argv[i]).find("--") == 0) {
+            if (i + 1 < argc) {
+                args[argv[i]] = argv[i+1];
+            }
+        }
+    }
+    return args;
+}
+
+std::vector<std::string> split_paths(const std::string& paths, char delim = ':') {
+    std::vector<std::string> result;
+    size_t start = 0, end = 0;
+    while ((end = paths.find(delim, start)) != std::string::npos) {
+        if (end > start)
+            result.push_back(paths.substr(start, end - start));
+        start = end + 1;
+    }
+    if (!paths.substr(start).empty())
+        result.push_back(paths.substr(start));
+    return result;
+}
+
+
 int main(int argc, char** argv) {
-    if (argc != 7) {
-        std::cerr << "Usage: " << argv[0] << " <model_path> <gestures_folder_path> <language> <socket_path> <num_gestures> <font_path>\n";
+
+    auto args = parse_args(argc, argv);
+
+    // List of required argument names (without leading "--" since parse_args strips it)
+    std::vector<std::string> required_keys = {
+        "--model_path", "--gestures_folder_path", "--language", "--socket_path", "--num_gestures", "--font_path"
+    };
+
+    bool missing = false;
+    for (const auto& key : required_keys) {
+        if (args.find(key) == args.end()) {
+            std::cerr << "Missing required argument: --" << key << std::endl;
+            missing = true;
+        }
+    }
+
+    if (missing) {
+        std::cerr << "Usage: " << argv[0]
+                  << " --model_path <path>"
+                  << " --gestures_folder_path <path1>:<path2>"
+                  << " --language <lang>"
+                  << " --socket_path <path>"
+                  << " --num_gestures <int>"
+                  << " --font_path <path>"
+                  << " [--locales_paths <path1>:<path2>]"
+                  << " [--gestures_list <gesture1>:<gesture2>:...]\n";
         return EXIT_FAILURE;
     }
 
-    const std::string model_path = argv[1];
-    const std::string gestures_folder_path = argv[2];
-    const std::string language = argv[3];
-    const std::string socket_path = argv[4];
-    int num_gestures = std::stoi(argv[5]);
-    const std::string font_path = argv[6];
+    std::string model_path = args["--model_path"];
+    std::string gestures_folder_path = args["--gestures_folder_path"];
+    std::vector<std::string> gestures_folders = split_paths(gestures_folder_path);
+    std::string language = args["--language"];
+    std::string socket_path = args["--socket_path"];
+    int num_gestures = std::stoi(args["--num_gestures"]);
+    std::string font_path = args["--font_path"];
+
+    std::vector<std::string> locales_paths;
+    if (args.find("--locales_paths") != args.end())
+        locales_paths = split_paths(args["--locales_paths"]);
+    
+    std::set<std::string> allowed_gestures;
+    if (args.find("--gestures_list") != args.end()) {
+        auto lst = split_paths(args["--gestures_list"]); // uses ':' by default
+        allowed_gestures = std::set<std::string>(lst.begin(), lst.end());
+    }
+
+    for (const auto& folder : gestures_folders)
+        locales_paths.push_back(folder + "/locales");
 
     std::cout << "Starting Liveness Detector Server...\n";
 
@@ -107,15 +172,20 @@ int main(int argc, char** argv) {
     // Load gesture definitions from JSON files.
     std::vector<std::string> gestureFiles;
 
-    try {
-        for (const auto& entry : fs::directory_iterator(gestures_folder_path)) {
-            if (entry.path().extension() == ".json") {
-                gestureFiles.push_back(entry.path().string());
+    for (const auto& folder : gestures_folders) {
+        try {
+            for (const auto& entry : fs::directory_iterator(folder)) {
+                if (entry.path().extension() == ".json") {
+                    std::string basename = entry.path().stem().string(); // without extension
+                    if (allowed_gestures.empty() || allowed_gestures.count(basename) > 0) {
+                        gestureFiles.push_back(entry.path().string());
+                    }
+                }
             }
+        } catch (fs::filesystem_error& e) {
+            std::cerr << "Error accessing the gestures folder: " << folder << ": " << e.what() << "\n";
+            // Continue trying other folders (don't return yet);
         }
-    } catch (fs::filesystem_error& e) {
-        std::cerr << "Error accessing the gestures folder: " << e.what() << "\n";
-        return EXIT_FAILURE;
     }
 
     if (gestureFiles.empty()) {
@@ -157,9 +227,7 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    // Create a TranslationManager using the locales folder inside the gestures_folder_path.
-    std::string locales_path = gestures_folder_path + "/locales";
-    TranslationManager translator(language, locales_path);
+    TranslationManager translator(language, locales_paths);
 
     // Create a GesturesRequester.
     GesturesRequester requester(static_cast<int>(loadedGestures.size()),
