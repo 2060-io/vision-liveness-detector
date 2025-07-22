@@ -148,7 +148,7 @@ Example custom gesture:
     ]
 }
 ```
-See [src/livenessDetectorServerApp/gestures/blink.json](src/livenessDetectorServerApp/gestures/blink.json) for a reference.
+See [src/livenessDetectorServerApp/gestures/blink.json](src/livenessDetectorServerApp/gestures/blink.json) for a reference and [src/livenessDetectorServerApp/gestures/How_To_Gestures_Readme.md](src/livenessDetectorServerApp/gestures/How_To_Gestures_Readme.md) for a full explanation of how gestures can be made.
 
 Example custom locale (for Spanish):
 ```json
