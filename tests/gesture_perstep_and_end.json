@@ -1,0 +1,22 @@
+{
+    "gestureId": "perstep_and_end",
+    "label": "Per-Step and End",
+    "icon_path": "",
+    "signal_index": 1,
+    "total_recommended_max_time": 15000,
+    "take_picture_at_the_end": true,
+    "randomize_step_picture": false,
+    "instructions": [
+        {
+            "instruction_type": "threshold",
+            "move_to_next_type": "higher",
+            "value": 3.0,
+            "take_picture_at_the_end": true
+        },
+        {
+            "instruction_type": "threshold",
+            "move_to_next_type": "higher",
+            "value": 9.5
+        }
+    ]
+}

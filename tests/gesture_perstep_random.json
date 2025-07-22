@@ -1,0 +1,29 @@
+{
+    "gestureId": "perstep_random",
+    "label": "Per-Step Random",
+    "icon_path": "",
+    "signal_index": 1,
+    "total_recommended_max_time": 10000,
+    "take_picture_at_the_end": false,
+    "randomize_step_picture": true,
+    "instructions": [
+        {
+            "instruction_type": "threshold",
+            "move_to_next_type": "higher",
+            "value": 6.0,
+            "take_picture_at_the_end": true
+        },
+        {
+            "instruction_type": "threshold",
+            "move_to_next_type": "lower",
+            "value": 2.5,
+            "take_picture_at_the_end": true
+        },
+        {
+            "instruction_type": "threshold",
+            "move_to_next_type": "higher",
+            "value": 10.0,
+            "take_picture_at_the_end": false
+        }
+    ]
+}

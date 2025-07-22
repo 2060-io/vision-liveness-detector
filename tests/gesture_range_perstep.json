@@ -1,0 +1,22 @@
+{
+    "gestureId": "range_perstep",
+    "label": "Range Per-Step",
+    "icon_path": "",
+    "signal_index": 3,
+    "total_recommended_max_time": 12000,
+    "take_picture_at_the_end": false,
+    "randomize_step_picture": false,
+    "instructions": [
+        {
+            "instruction_type": "range",
+            "min_value": 3.0,
+            "max_value": 5.0,
+            "min_duration_ms": 1100,
+            "reset": {
+                "type": "timeout_after_ms",
+                "value": 3000
+            },
+            "take_picture_at_the_end": true
+        }
+    ]
+}
