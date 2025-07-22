@@ -56,5 +56,6 @@ private:
     std::function<void(const std::string&)> signal_trigger_callback_;
 
     void signal_trigger(Gesture* gesture);
+
     static std::vector<Gesture::Step> parse_instructions(const nlohmann::json& instructions);
 };

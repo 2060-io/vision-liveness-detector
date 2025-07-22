@@ -53,14 +53,31 @@ GestureDetector::AddResult GestureDetector::add_gesture_from_file(const std::str
             signal_key = gesture_data["signal_key"].get<std::string>();
         }
 
+        double total_recommended_max_time = 0.0;
+        if (gesture_data.contains("total_recommended_max_time")) {
+            total_recommended_max_time = gesture_data["total_recommended_max_time"].get<double>();
+        }
+
+        bool take_picture_at_the_end = false;
+        if (gesture_data.contains("take_picture_at_the_end")) {
+            take_picture_at_the_end = gesture_data["take_picture_at_the_end"].get<bool>();
+        }
+
+        // NEW: randomize_step_picture parsing (default: false)
+        bool randomize_step_picture = false;
+        if (gesture_data.contains("randomize_step_picture")) {
+            randomize_step_picture = gesture_data["randomize_step_picture"].get<bool>();
+        }
+
         auto gesture = std::make_unique<Gesture>(
             gesture_data["gestureId"].get<std::string>(),
             gesture_data["label"].get<std::string>(),
-            gesture_data["total_recommended_max_time"].get<double>(),
-            gesture_data["take_picture_at_the_end"].get<bool>(),
+            total_recommended_max_time,
+            take_picture_at_the_end,
             parse_instructions(gesture_data["instructions"]),
             signal_index,
-            signal_key
+            signal_key,
+            randomize_step_picture  // <-- pass the new arg
         );
         std::cout << "New gesture with size: " << gesture->get_sequence().size() << std::endl;
 
@@ -215,6 +232,13 @@ std::vector<Gesture::Step> GestureDetector::parse_instructions(const nlohmann::j
             if (type_str == "range")
                 instr_type = Gesture::Step::StepType::Range;
         }
+
+        // Parse per-step take_picture_at_the_end (default: false)
+        bool step_take_picture = false;
+        if (item.contains("take_picture_at_the_end")) {
+            step_take_picture = item["take_picture_at_the_end"].get<bool>();
+        }
+
         if (instr_type == Gesture::Step::StepType::Threshold) {
             // --- Threshold step ---
             Gesture::Step::MoveType move_type = (item["move_to_next_type"] == "higher") ?
@@ -247,7 +271,9 @@ std::vector<Gesture::Step> GestureDetector::parse_instructions(const nlohmann::j
                 move_type,                                                // move_to_next_type
                 value,                                                    // value
                 0, 0, 0,                                                  // min_value, max_value, min_duration_ms (unused)
-                reset_condition                                           // reset
+                reset_condition,                                          // reset
+                std::nullopt,                                             // entered_range_time
+                step_take_picture                                         // per-step picture
             });
         } else if (instr_type == Gesture::Step::StepType::Range) {
             // --- Range/Hold step ---
@@ -282,7 +308,9 @@ std::vector<Gesture::Step> GestureDetector::parse_instructions(const nlohmann::j
                 Gesture::Step::MoveType::Higher,               // move_to_next_type (irrelevant)
                 0,                                             // value (not used)
                 min_value, max_value, min_duration_ms,         // Range params
-                reset_condition                                // reset
+                reset_condition,                               // reset
+                std::nullopt,                                  // entered_range_time
+                step_take_picture                              // per-step picture
             });
         }
     }

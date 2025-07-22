@@ -5,6 +5,7 @@
     "signal_index": 1,
     "total_recommended_max_time": 10000,
     "take_picture_at_the_end": false,
+    "randomize_step_picture": false,
     "instructions": [
         {
             "instruction_type": "threshold",
@@ -13,7 +14,8 @@
             "reset": {
                 "type": "lower",
                 "value": 5.0
-            }
+            },
+            "take_picture_at_the_end": true
         },
         {
             "instruction_type": "threshold",
@@ -22,7 +24,8 @@
             "reset": {
                 "type": "timeout_after_ms",
                 "value": 5000
-            }
+            },
+            "take_picture_at_the_end": true
         },
         {
             "instruction_type": "threshold",

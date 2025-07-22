@@ -5,6 +5,7 @@
     "signal_index": 2,
     "total_recommended_max_time": 10000,
     "take_picture_at_the_end": false,
+    "randomize_step_picture": true,
     "instructions": [
         {
             "instruction_type": "range",
@@ -14,7 +15,8 @@
             "reset": {
                 "type": "timeout_after_ms",
                 "value": 5000
-            }
+            },
+            "take_picture_at_the_end": true
         }
     ]
 }

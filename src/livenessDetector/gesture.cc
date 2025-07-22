@@ -1,6 +1,8 @@
 #include "gesture.h"
 #include <chrono>
 #include <iostream>
+#include <algorithm>
+#include <random>
 
 Gesture::Gesture(std::string gestureId,
                  std::string label,
@@ -8,7 +10,8 @@ Gesture::Gesture(std::string gestureId,
                  bool take_picture_at_the_end,
                  std::vector<Step> sequence,
                  std::optional<int> signal_index,
-                 std::optional<std::string> signal_key)
+                 std::optional<std::string> signal_key,
+                 bool randomize_step_picture)
     : working_(false),
       gestureId_(gestureId),
       label_(std::move(label)),
@@ -18,7 +21,32 @@ Gesture::Gesture(std::string gestureId,
       take_picture_at_the_end_(take_picture_at_the_end),
       sequence_(std::move(sequence)),
       current_index_(0),
-      start_time_(std::chrono::system_clock::now()) {}
+      start_time_(std::chrono::system_clock::now()),
+      randomize_step_picture_(randomize_step_picture)
+{
+    select_random_picture_step();
+}
+
+void Gesture::select_random_picture_step() {
+    chosen_picture_step_.reset();
+    if (randomize_step_picture_) {
+        std::vector<size_t> candidates;
+        for (size_t i = 0; i < sequence_.size(); ++i) {
+            if (sequence_[i].take_picture_at_the_end)
+                candidates.push_back(i);
+        }
+        if (!candidates.empty()) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> distrib(0, candidates.size() - 1);
+            chosen_picture_step_ = candidates[distrib(gen)];
+        }
+    }
+}
+
+void Gesture::set_picture_callback(std::function<void(int)> cb) {
+    picture_callback_ = std::move(cb);
+}
 
 bool Gesture::update(double value, std::optional<int> index, std::optional<std::string> signal_key) {
     if (!working_)
@@ -29,7 +57,7 @@ bool Gesture::update(double value, std::optional<int> index, std::optional<std::
         if (current_index_ >= sequence_.size())
             return false;
 
-        Step& curr_step = sequence_[current_index_]; // Non-const, because for Range we need mutable
+        Step& curr_step = sequence_[current_index_];
 
         bool step_complete = false;
         switch (curr_step.step_type) {
@@ -40,16 +68,35 @@ bool Gesture::update(double value, std::optional<int> index, std::optional<std::
                 step_complete = check_step_range_(value, curr_step);
                 break;
             default:
-                // Unknown type, ignore
                 break;
         }
+
         if (step_complete) {
-            curr_step.entered_range_time.reset(); // Reset in case we have range tracking
+            // --- PER-STEP PICTURE LOGIC ---
+            bool trigger_picture = false;
+            if (randomize_step_picture_) {
+                if (chosen_picture_step_ && *chosen_picture_step_ == current_index_)
+                    trigger_picture = true;
+            } else {
+                if (curr_step.take_picture_at_the_end)
+                    trigger_picture = true;
+            }
+            if (trigger_picture && picture_callback_) {
+                picture_callback_(static_cast<int>(current_index_));
+            }
+            // --- END LOGIC ---
+
+            curr_step.entered_range_time.reset();
+
             if (current_index_ == 0) {
                 start_time_ = std::chrono::system_clock::now();
             }
             current_index_++;
             if (current_index_ >= sequence_.size()) {
+                // GESTURE-END GLOBAL PICTURE LOGIC
+                if (take_picture_at_the_end_ && picture_callback_) {
+                    picture_callback_(-1);  // -1 or another special value means "END"
+                }
                 return true;
             }
         } else {
@@ -68,10 +115,10 @@ void Gesture::stop() {
 void Gesture::reset() {
     current_index_ = 0;
     start_time_ = std::chrono::system_clock::now();
-    // Reset range timing for all steps
     for (auto& step : sequence_) {
         step.entered_range_time.reset();
     }
+    select_random_picture_step();
 }
 
 std::string Gesture::get_label() const {
@@ -117,40 +164,33 @@ std::chrono::system_clock::time_point Gesture::get_start_time() const {
 void Gesture::start() {
     reset();
     working_ = true;
+    select_random_picture_step();
 }
 
 bool Gesture::check_step_threshold_(double value, const Step& step) const {
     switch (step.move_to_next_type) {
-        case Step::MoveType::Higher:
-            return value > step.value;
-        case Step::MoveType::Lower:
-            return value < step.value;
-        default:
-            return false;
+        case Step::MoveType::Higher: return value > step.value;
+        case Step::MoveType::Lower:  return value < step.value;
+        default:                     return false;
     }
 }
 
 bool Gesture::check_step_range_(double value, Step& step) const {
     using clock = std::chrono::system_clock;
     auto now = clock::now();
-
-    // Check if we are inside the range
     if (value >= step.min_value && value <= step.max_value) {
-        // If not already started, set start time
         if (!step.entered_range_time.has_value()) {
             step.entered_range_time = now;
-            return false; // Need to stay for duration
+            return false;
         } else {
-            // Check duration
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - *step.entered_range_time);
             if (duration.count() >= step.min_duration_ms) {
-                step.entered_range_time.reset(); // clear for next run
-                return true; // Range held for enough time!
+                step.entered_range_time.reset();
+                return true;
             }
             return false;
         }
     } else {
-        // Left the required range: reset timer
         step.entered_range_time.reset();
         return false;
     }
