@@ -1,0 +1,20 @@
+{
+    "gestureId": "range1",
+    "label": "Range Hold Test",
+    "icon_path": "",
+    "signal_index": 2,
+    "total_recommended_max_time": 10000,
+    "take_picture_at_the_end": false,
+    "instructions": [
+        {
+            "instruction_type": "range",
+            "min_value": 2.0,
+            "max_value": 4.0,
+            "min_duration_ms": 2000,
+            "reset": {
+                "type": "timeout_after_ms",
+                "value": 5000
+            }
+        }
+    ]
+}

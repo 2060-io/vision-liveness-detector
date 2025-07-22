@@ -8,16 +8,28 @@
 class Gesture {
 public:
     struct Step {
+        enum class StepType { Threshold, Range };
+        StepType step_type = StepType::Threshold;  // Default to Threshold for backwards compatibility
+
+        // For Threshold step:
         enum class MoveType { Higher, Lower };
         MoveType move_to_next_type;
         double value;
 
+        // For Range step:
+        double min_value;
+        double max_value;
+        int min_duration_ms;
+
         struct ResetCondition {
             enum class Type { Lower, Higher, TimeoutAfterMs };
             Type type;
-            double value;
+            double value; // For TimeoutAfterMs, this is ms. For Higher/Lower, it's a threshold.
         };
         std::optional<ResetCondition> reset;
+
+        // For range holding, we need to track the entry time for this step
+        mutable std::optional<std::chrono::system_clock::time_point> entered_range_time;
     };
 
     Gesture(std::string gestureId,
@@ -55,6 +67,7 @@ private:
     size_t current_index_;
     std::chrono::system_clock::time_point start_time_;
 
-    bool check_(double value) const;
+    bool check_step_threshold_(double value, const Step& step) const;
+    bool check_step_range_(double value, Step& step) const;
     bool check_reset_(double value) const;
 };
