@@ -102,6 +102,17 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_test(
+    name = "protocol_handler_test",
+    srcs = ["protocol_handler_test.cc"],
+    deps = [
+        ":protocol_handler",
+        "@com_google_googletest//:gtest_main",
+        "//third_party:opencv",
+    ],
+    copts = ["-std=c++17"],
+)
+
 cc_binary(
     name = "gesture_test",
     srcs = ["gesture_test.cc"],
@@ -144,4 +155,6 @@ cc_binary(
     ],
     visibility = ["//visibility:public"],
 )
+
+
 
