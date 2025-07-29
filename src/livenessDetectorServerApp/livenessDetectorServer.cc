@@ -475,7 +475,7 @@ int main(int argc, char** argv) {
 
     while (true) {
         // Accept a new client connection
-        UnixSocketTransport* client = listener.accept_client();
+        auto client = listener.accept_client();
         if (!client) {
             std::cerr << "Accept failed, continuing ...\n";
             continue;
@@ -483,13 +483,13 @@ int main(int argc, char** argv) {
         std::cout << "Client connected ...\n";
         // Handle protocol messages for this session
         ProtocolHandler handler(
-            client,
+            client.get(), // GOOD: this is a UnixSocketTransport*
             imageProcessingCallback,
             dataProcessingCallback
         );
         handler.serve(); // processes all requests on this client connection
         std::cout << "Client disconnected ...\n";
-        delete client;
+        //delete client;
     }
 
     return 0;

@@ -11,10 +11,10 @@ ProtocolHandler::ProtocolHandler(
     : m_transport(transport), m_img_cb(img_callback), m_data_cb(data_callback) {}
 
 bool ProtocolHandler::read_exact(void* buf, size_t size) {
-    return m_transport->read(buf, size);
+    return m_transport->read_exact(buf, size);
 }
 bool ProtocolHandler::write_exact(const void* buf, size_t size) {
-    return m_transport->write(buf, size);
+    return m_transport->write_exact(buf, size);
 }
 
 bool ProtocolHandler::send_image(const cv::Mat& img) {

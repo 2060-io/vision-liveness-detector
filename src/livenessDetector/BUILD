@@ -82,6 +82,15 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_test(
+    name = "unix_socket_transport_test",
+    srcs = ["unix_socket_transport_test.cc"],
+    deps = [
+        ":unix_socket_transport",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "protocol_handler",
     srcs = ["protocol_handler.cc"],
