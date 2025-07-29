@@ -253,12 +253,6 @@ int main(int argc, char** argv) {
     if (args.find("--locales_paths") != args.end())
         locales_paths = split_paths(args["--locales_paths"]);
 
-    std::set<std::string> allowed_gestures;
-    if (args.find("--gestures_list") != args.end()) {
-        auto lst = split_paths(args["--gestures_list"]); // uses ':' by default
-        allowed_gestures = std::set<std::string>(lst.begin(), lst.end());
-    }
-
     for (const auto& folder : gestures_folders)
         locales_paths.push_back(folder + "/locales");
 
@@ -269,45 +263,86 @@ int main(int argc, char** argv) {
 
     std::string warning_message = "";
 
-    // Load gesture definitions from JSON files.
-    std::vector<std::string> gestureFiles;
+    // ===========================
+    // GESTURE LOADING LOGIC START
+    // ===========================
+    // Parse gestures_list if present (ordered so no set)
+    std::vector<std::string> gestures_list;
+    if (args.find("--gestures_list") != args.end()) {
+        gestures_list = split_paths(args["--gestures_list"]);
+    }
 
+    // Build map: gesture_name -> full_path
+    std::unordered_map<std::string, std::string> gesture_name2path;
     for (const auto& folder : gestures_folders) {
         try {
             for (const auto& entry : fs::directory_iterator(folder)) {
                 if (entry.path().extension() == ".json") {
-                    std::string basename = entry.path().stem().string(); // without extension
-                    if (allowed_gestures.empty() || allowed_gestures.count(basename) > 0) {
-                        gestureFiles.push_back(entry.path().string());
+                    auto stem = entry.path().stem().string();
+                    // Only record first occurrence per gesture name
+                    if (!gesture_name2path.count(stem)) {
+                        gesture_name2path[stem] = entry.path().string();
                     }
                 }
             }
         } catch (fs::filesystem_error& e) {
             std::cerr << "Error accessing the gestures folder: " << folder << ": " << e.what() << "\n";
-            // Continue trying other folders (don't return yet);
+            // Continue trying other folders
+        }
+    }
+
+    std::vector<std::string> gestureFiles;
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    if (gestures_list.empty()) {
+        // No gestures_list: pick num_gestures at random from all available
+        for (const auto& kv : gesture_name2path)
+            gestureFiles.push_back(kv.second);
+
+        if (num_gestures > static_cast<int>(gestureFiles.size())) {
+            std::cerr << "Requested number of gestures exceeds available gestures. Exiting application.\n";
+            return EXIT_FAILURE;
+        }
+        std::shuffle(gestureFiles.begin(), gestureFiles.end(), g);
+        gestureFiles.resize(num_gestures);
+    } else {
+        // gestures_list provided: build explicit ordered list
+        std::vector<std::string> explicitListPaths;
+        for (const auto& name : gestures_list) {
+            auto it = gesture_name2path.find(name);
+            if (it == gesture_name2path.end()) {
+                std::cerr << "Gesture '" << name << "' not found in folders. Exiting.\n";
+                return EXIT_FAILURE;
+            }
+            explicitListPaths.push_back(it->second);
+        }
+
+        if (static_cast<int>(explicitListPaths.size()) == num_gestures) {
+            // Use exact list, in order, no shuffle!
+            gestureFiles = explicitListPaths;
+        } else if (static_cast<int>(explicitListPaths.size()) > num_gestures) {
+            // Randomly pick num_gestures from gestures_list
+            std::shuffle(explicitListPaths.begin(), explicitListPaths.end(), g);
+            explicitListPaths.resize(num_gestures);
+            gestureFiles = explicitListPaths;
+        } else {
+            std::cerr << "gestures_list contains fewer gestures (" << explicitListPaths.size()
+                      << ") than num_gestures (" << num_gestures << "). Exiting.\n";
+            return EXIT_FAILURE;
         }
     }
 
     if (gestureFiles.empty()) {
-        std::cerr << "No gesture JSON files found in the specified folder. Exiting application.\n";
+        std::cerr << "No gesture JSON files found in the specified folder(s). Exiting application.\n";
         return EXIT_FAILURE;
     }
+    // =========================
+    // GESTURE LOADING LOGIC END
+    // =========================
 
-    // Ensure we do not attempt to select more gestures than available
-    if (num_gestures > static_cast<int>(gestureFiles.size())) {
-        std::cerr << "Requested number of gestures exceeds available gestures. Exiting application.\n";
-        return EXIT_FAILURE;
-    }
-
-    // Randomly shuffle and select the specified number of gestures
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(gestureFiles.begin(), gestureFiles.end(), g);
-
-    // Select only the specified number of gestures
-    gestureFiles.resize(num_gestures);
-
-    // Create an instance of GestureDetector
+    // Load gesture definitions from JSON
+    // (unchanged)
     GestureDetector detector;
     std::vector<GestureDetector::AddResult> loadedGestures;
 
