@@ -31,7 +31,7 @@ class GestureServerClient:
         extra_locales_paths=None, 
         gestures_list=None,
         glasses_detector_mode="OFF",
-        glasses_model_path=os.path.join(os.path.dirname(__file__),'./model/model.onnx')
+        glasses_model_path=os.path.join(os.path.dirname(__file__),'./model/glasses_model.onnx')
     ):
         self.server_executable_path = os.path.join(os.path.dirname(__file__), get_server_executable_path())
         self.model_path = os.path.join(os.path.dirname(__file__),'./model/face_landmarker.task')

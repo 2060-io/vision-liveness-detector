@@ -209,7 +209,7 @@ int main(int argc, char** argv) {
     if (args.find("--glasses_model_path") != args.end()) {
         glasses_model_path = args["--glasses_model_path"];
     } else {
-        glasses_model_path = "model.onnx"; // default/fallback
+        glasses_model_path = "glasses_model.onnx"; // default/fallback
     }
 
     // List of required argument names (without leading "--" since parse_args strips it)

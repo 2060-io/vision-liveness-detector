@@ -7,6 +7,10 @@ include ../../LICENSE
 # Include model task
 include ./liveness_detector/model/face_landmarker.task
 
+# Include model task
+include ./liveness_detector/model/glasses_model.onnx
+
+
 #include default font
 include ./liveness_detector/fonts/DejaVuSans.ttf
 
