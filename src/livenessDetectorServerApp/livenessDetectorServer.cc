@@ -1,9 +1,11 @@
 #include "livenessDetector/gesture_detector.h"
 #include "livenessDetector/gestures_requester.h"
 #include "livenessDetector/translation_manager.h"
-#include "livenessDetector/unix_socket_server.h"
 #include "livenessDetector/face_processor.h"
 #include "livenessDetector/nlohmann/json.hpp"
+
+#include "livenessDetector/unix_socket_transport.h"
+#include "livenessDetector/protocol_handler.h"
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
@@ -461,20 +463,34 @@ int main(int argc, char** argv) {
         return {};
     };
 
-    UnixSocketServer socketServer(
-        socket_path, 
-        imageProcessingCallback,
-        dataProcessingCallback
-    );
+    // ------------ TRANSPORT/PROTOCOL HANDLER USED INSTEAD OF UNIX_SOCKET_SERVER -------------
+    UnixSocketTransport listener(socket_path);
 
-    if (!socketServer.start()) {
-        std::cerr << "Failed to start UnixSocketServer.\n";
+    if (!listener.open_server()) {
+        std::cerr << "Failed to open Unix socket at " << socket_path << "\n";
         return EXIT_FAILURE;
     }
 
-    std::cout << "UnixSocketServer started at path: " << socket_path << ". Waiting for connection from Python client...\n";
+    std::cout << "Server listening at socket: " << socket_path << ". Waiting for connection from Python client...\n";
 
-    socketServer.run();
+    while (true) {
+        // Accept a new client connection
+        UnixSocketTransport* client = listener.accept_client();
+        if (!client) {
+            std::cerr << "Accept failed, continuing ...\n";
+            continue;
+        }
+        std::cout << "Client connected ...\n";
+        // Handle protocol messages for this session
+        ProtocolHandler handler(
+            client,
+            imageProcessingCallback,
+            dataProcessingCallback
+        );
+        handler.serve(); // processes all requests on this client connection
+        std::cout << "Client disconnected ...\n";
+        delete client;
+    }
 
     return 0;
 }
