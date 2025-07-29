@@ -27,6 +27,7 @@ public:
     void ProcessImage(const cv::Mat& img);
     void SetDoProcessImage(bool value);
     void SetCallback(std::function<void(const std::map<std::string, float>&, const std::map<std::string, float>&)> callbackFn);
+    const cv::Mat& GetLastInputImage() const { return last_input_image_; }
 
 private:
     void ResultCallbackImpl(const absl::StatusOr<mediapipe::tasks::vision::face_landmarker::FaceLandmarkerResult>& result_or, const mediapipe::Image& image, int64_t timestamp_ms);
@@ -35,6 +36,7 @@ private:
     std::unique_ptr<mediapipe::tasks::vision::face_landmarker::FaceLandmarker> landmarker_;
     bool do_process_image_ = false;
     std::function<void(const std::map<std::string, float>&, const std::map<std::string, float>&)> results_callback_fn_;
+    cv::Mat last_input_image_;
 };
 
 #endif // FACE_PROCESSOR_H

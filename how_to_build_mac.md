@@ -122,6 +122,7 @@ cc_library(
         "lib/libopencv_freetype.dylib",
         "lib/libopencv_face.dylib",          # Optional (nonfree)
         "lib/libopencv_xfeatures2d.dylib",   # Optional (nonfree)
+        "lib/libopencv_dnn.dylib",
     ]),
     hdrs = glob(["include/opencv4/opencv2/**/*.h*"]),
     includes = ["include/opencv4"],
