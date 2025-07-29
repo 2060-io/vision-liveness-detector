@@ -1,6 +1,6 @@
 import socket
 import os
-from transport import Transport
+from .transport import Transport
 
 class UnixSocketTransport(Transport):
     def __init__(self, socket_path):

@@ -1,4 +1,3 @@
-import socket
 import os
 import platform
 import subprocess
@@ -7,6 +6,8 @@ import time
 import numpy as np
 import json
 
+from .unix_socket_transport import UnixSocketTransport
+from .protocol_handler import ProtocolHandler
 
 def get_server_executable_path():
     system = platform.system().lower()
@@ -21,22 +22,27 @@ def get_server_executable_path():
     else:
         sys.exit(f"Unsupported platform: {system} {machine}")
 
+
 class GestureServerClient:
+    """
+    Client for the liveness detector server, using a pluggable transport and protocol handler.
+    """
     def __init__(
-        self, 
-        language, 
-        socket_path, 
-        num_gestures, 
-        extra_gestures_paths=None, 
-        extra_locales_paths=None, 
+        self,
+        language,
+        socket_path,
+        num_gestures,
+        extra_gestures_paths=None,
+        extra_locales_paths=None,
         gestures_list=None,
         glasses_detector_mode="OFF",
-        glasses_model_path=os.path.join(os.path.dirname(__file__),'./model/glasses_model.onnx')
+        glasses_model_path=None
     ):
+        # Set up resources and server args
         self.server_executable_path = os.path.join(os.path.dirname(__file__), get_server_executable_path())
-        self.model_path = os.path.join(os.path.dirname(__file__),'./model/face_landmarker.task')
-        self.gestures_folder_path = os.path.join(os.path.dirname(__file__),'./gestures')
-        self.font_path = os.path.join(os.path.dirname(__file__),'./fonts/DejaVuSans.ttf')
+        self.model_path = os.path.join(os.path.dirname(__file__), './model/face_landmarker.task')
+        self.gestures_folder_path = os.path.join(os.path.dirname(__file__), './gestures')
+        self.font_path = os.path.join(os.path.dirname(__file__), './fonts/DejaVuSans.ttf')
         self.language = language
         self.socket_path = socket_path
         self.num_gestures = num_gestures
@@ -46,16 +52,19 @@ class GestureServerClient:
         self.gestures_list = gestures_list if gestures_list else []
 
         self.glasses_detector_mode = glasses_detector_mode if glasses_detector_mode else "OFF"
-        self.glasses_model_path = glasses_model_path
+        self.glasses_model_path = glasses_model_path or os.path.join(os.path.dirname(__file__), './model/glasses_model.onnx')
 
         self.server_process = None
-        self.client_socket = None
+        self.transport = None  # Will be set to UnixSocketTransport or other
+        self.protocol = None   # ProtocolHandler instance
+
+        # Optional user callback hooks
         self.string_callback = None
         self.take_picture_callback = None
         self.report_alive_callback = None
 
     def set_string_callback(self, callback):
-        """ Set the callback function for string messages. """
+        """ Set the callback function for string/JSON messages. """
         self.string_callback = callback
 
     def set_take_picture_callback(self, callback):
@@ -67,11 +76,11 @@ class GestureServerClient:
         self.report_alive_callback = callback
 
     def set_font_path(self, font_path):
-        """ Set the font path to be used. Use it before call start_server. """
+        """ Set the font path to be used. Use before calling start_server."""
         self.font_path = font_path
 
     def cleanup_socket(self):
-        """ Remove the socket file if it exists. """
+        """ Remove the socket file if it exists (for UNIX transport). """
         try:
             if os.path.exists(self.socket_path):
                 os.remove(self.socket_path)
@@ -80,24 +89,20 @@ class GestureServerClient:
             print(f"Error removing socket file: {e}")
 
     def start_server(self):
-        """ Start the server process. """
+        """ Start the server process and establish transport/protocol connection. """
         self.cleanup_socket()
 
-        # Compose gestures_folder_path for argument (main + extras)
+        # Compose arguments
         all_gesture_paths = [self.gestures_folder_path] + self.extra_gestures_paths
         gestures_folder_arg = ':'.join(all_gesture_paths)
 
-        # Compose locales_paths (if any)
         locales_paths_arg = None
         if self.extra_locales_paths:
             locales_paths_arg = ':'.join(self.extra_locales_paths)
-
-        # Compose gestures_list (if any)
         gestures_list_arg = None
         if self.gestures_list:
             gestures_list_arg = ':'.join(self.gestures_list)
 
-        # Build command with argument names ('--...')
         server_command = [
             self.server_executable_path,
             "--model_path", self.model_path,
@@ -107,15 +112,11 @@ class GestureServerClient:
             "--num_gestures", str(self.num_gestures),
             "--font_path", self.font_path,
         ]
-
-        # Add optional arguments
         if locales_paths_arg:
             server_command.extend(["--locales_paths", locales_paths_arg])
         if gestures_list_arg:
             server_command.extend(["--gestures_list", gestures_list_arg])
-
-        # ----- Glasses detection args -----
-        # Only add if not OFF, or if model path is provided
+        # Glasses detector handling
         mode_str = str(self.glasses_detector_mode).strip().upper()
         if mode_str != "OFF":
             server_command.extend(["--glasses_detector", mode_str])
@@ -129,20 +130,22 @@ class GestureServerClient:
         print("Launching server with:", " ".join(server_command))
         self.server_process = subprocess.Popen(server_command)
 
+        # Wait for the server to create the socket.
         start_time = time.time()
         while not os.path.exists(self.socket_path):
             if time.time() - start_time > 30:
                 print("Timeout while waiting for the server to create the socket.")
                 self.stop_server()
                 return False
-
             print(f"Waiting for server socket at {self.socket_path}...")
             time.sleep(0.5)
 
-        self.client_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        # --- Establish ProtocolHandler over the transport ---
+        self.transport = UnixSocketTransport(self.socket_path)
         try:
-            self.client_socket.connect(self.socket_path)
+            self.transport.connect()
             print("Connected to server")
+            self.protocol = ProtocolHandler(self.transport)
             return True
         except Exception as e:
             print(f"Error connecting to server: {e}")
@@ -151,91 +154,53 @@ class GestureServerClient:
 
     def set_overwrite_text(self, text):
         """ Send a command to the server to set the overwrite text. """
-        if self.client_socket is None:
+        if not self.protocol:
             raise RuntimeError("Server not started or connection failed.")
-        message = {
+
+        self.protocol.send_config_json({
             "action": "set",
             "variable": "overwrite_text",
             "value": text
-        }
-        data = json.dumps(message).encode('utf-8')
-        self.client_socket.sendall((0x02).to_bytes(1, 'big'))
-        self.client_socket.sendall(len(data).to_bytes(4, 'big'))
-        self.client_socket.sendall(data)
+        })
 
     def set_warning_message(self, text):
         """ Send a command to the server to set the warning message. """
-        if self.client_socket is None:
+        if not self.protocol:
             raise RuntimeError("Server not started or connection failed.")
-        message = {
+
+        self.protocol.send_config_json({
             "action": "set",
             "variable": "warning_message",
             "value": text
-        }
-        data = json.dumps(message).encode('utf-8')
-        self.client_socket.sendall((0x02).to_bytes(1, 'big'))
-        self.client_socket.sendall(len(data).to_bytes(4, 'big'))
-        self.client_socket.sendall(data)
+        })
 
     def process_frame(self, frame):
-        """ Send a frame to the server and receive the processed frame. """
-        if self.client_socket is None:
+        """
+        Send a frame to the server and receive the processed frame (plus any JSON events).
+        Returns a processed frame np.ndarray or None on failure.
+        """
+        if self.protocol is None:
             raise RuntimeError("Server not started or connection failed.")
 
-        rows, cols, channels = frame.shape
-        frame_size = rows * cols * channels
+        self.protocol.send_image_request(frame)
 
-        function_id = (0x01).to_bytes(1, byteorder='big')
-
-        try:
-            self.client_socket.sendall(function_id)
-            self.client_socket.sendall(frame_size.to_bytes(4, byteorder='big'))
-            self.client_socket.sendall(rows.to_bytes(4, byteorder='big'))
-            self.client_socket.sendall(cols.to_bytes(4, byteorder='big'))
-            frame_bytes = frame.tobytes()
-            self.client_socket.sendall(frame_bytes)
-
-            while True:
-                response_function_id_data = self.client_socket.recv(1)
-                if not response_function_id_data:
-                    print("No response from server (function ID), quitting")
-                    return None
-
-                response_function_id = int.from_bytes(response_function_id_data, byteorder='big')
-
-                if response_function_id == 0x02:
-                    string_size_data = self.client_socket.recv(4)
-                    string_size = int.from_bytes(string_size_data, byteorder='big')
-                    string_data = self.client_socket.recv(string_size).decode('utf-8')
-
-                    # Process the JSON response
-                    self.handle_json_response(string_data)
-
-                elif response_function_id == 0x01:
-                    received_size_data = self.client_socket.recv(4)
-                    processed_size = int.from_bytes(received_size_data, byteorder='big')
-
-                    processed_rows_data = self.client_socket.recv(4)
-                    processed_cols_data = self.client_socket.recv(4)
-                    processed_rows = int.from_bytes(processed_rows_data, byteorder='big')
-                    processed_cols = int.from_bytes(processed_cols_data, byteorder='big')
-
-                    processed_frame_bytes = b''
-                    while len(processed_frame_bytes) < processed_size:
-                        packet = self.client_socket.recv(min(processed_size - len(processed_frame_bytes), 1024 * 1024))
-                        if not packet:
-                            print("Connection closed by server")
-                            return None
-                        processed_frame_bytes += packet
-
-                    processed_frame = np.frombuffer(processed_frame_bytes, dtype=np.uint8).reshape((processed_rows, processed_cols, channels))
-                    return processed_frame
-        except Exception as e:
-            print(f"Error processing frame: {e}")
-            return None
+        processed_frame = None
+        # Loop for responses: the server may send one or more JSON (0x02) before the processed image (0x01)
+        while True:
+            msg_type, data = self.protocol.recv_message()
+            if msg_type == 0x02:
+                self.handle_json_response(data)
+            elif msg_type == 0x01:
+                processed_frame = data
+                break
+            elif msg_type is None:
+                break
+        return processed_frame
 
     def handle_json_response(self, string_data):
-        """ Handle the JSON response and call appropriate callbacks. """
+        """
+        Handle the JSON response and call appropriate callbacks, if set.
+        """
         try:
             json_data = json.loads(string_data)
             if self.string_callback:
@@ -244,16 +209,18 @@ class GestureServerClient:
                 self.take_picture_callback(json_data['takeAPicture'])
             if 'reportAlive' in json_data and self.report_alive_callback:
                 self.report_alive_callback(json_data['reportAlive'])
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             print(f"Failed to decode JSON string: {string_data}")
 
     def stop_server(self):
-        """ Stop the server process and clean up. """
+        """ Stop the server process and clean up transport. """
         if self.server_process:
             self.server_process.send_signal(signal.SIGTERM)
             self.server_process.wait()
             self.server_process = None
-        if self.client_socket:
-            self.client_socket.close()
-            self.client_socket = None
+        if self.protocol:
+            self.protocol = None
+        if self.transport:
+            self.transport.close()
+            self.transport = None
         self.cleanup_socket()
