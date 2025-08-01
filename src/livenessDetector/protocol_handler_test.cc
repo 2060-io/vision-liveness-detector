@@ -43,6 +43,16 @@ inline void encode_uint32(std::vector<uint8_t>& out, uint32_t v) {
     out.insert(out.end(), p, p+4);
 }
 
+// Helper to build a [img_id|size|rows|cols|data] block for combined messages
+void append_combined_image_block(std::vector<uint8_t>& buf, uint32_t img_id, const cv::Mat& img) {
+    size_t data_len = img.total() * img.elemSize();
+    encode_uint32(buf, img_id);
+    encode_uint32(buf, static_cast<uint32_t>(data_len));
+    encode_uint32(buf, static_cast<uint32_t>(img.rows));
+    encode_uint32(buf, static_cast<uint32_t>(img.cols));
+    buf.insert(buf.end(), img.data, img.data + data_len);
+}
+
 TEST(ProtocolHandlerTest, ValidImageAndJson) {
     FakeTransport t;
 
@@ -81,7 +91,6 @@ TEST(ProtocolHandlerTest, ValidImageAndJson) {
     };
 
     ProtocolHandler handler(&t, img_cb, json_cb);
-    // Serve should end after two messages (input empty)
     handler.serve();
 
     EXPECT_TRUE(imageCbCalled);
@@ -101,7 +110,9 @@ TEST(ProtocolHandlerTest, RejectOversizeImage) {
     msg.insert(msg.end(), 3, 123);
     t.input_chunks.push(msg);
 
-    ProtocolHandler handler(&t, [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();}, [](const std::string&){return std::string();});
+    ProtocolHandler handler(&t,
+        [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();},
+        [](const std::string&){return std::string();});
     handler.serve();
 }
 
@@ -113,7 +124,9 @@ TEST(ProtocolHandlerTest, RejectOversizeJson) {
     msg.resize(msg.size() + (MAX_JSON_SIZE+1), 'a');
     t.input_chunks.push(msg);
 
-    ProtocolHandler handler(&t, [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();}, [](const std::string&){return std::string();});
+    ProtocolHandler handler(&t,
+        [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();},
+        [](const std::string&){return std::string();});
     handler.serve();
 }
 
@@ -123,7 +136,9 @@ TEST(ProtocolHandlerTest, InvalidFunctionID) {
     msg.push_back(99);  // Not a valid ProtocolMessageType
     t.input_chunks.push(msg);
 
-    ProtocolHandler handler(&t, [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();}, [](const std::string&){return std::string();});
+    ProtocolHandler handler(&t,
+        [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();},
+        [](const std::string&){return std::string();});
     handler.serve();
 }
 
@@ -137,7 +152,9 @@ TEST(ProtocolHandlerTest, TruncatedImageFailsGracefully) {
     // Missing actual payload (should be 6 bytes)
     t.input_chunks.push(msg);
 
-    ProtocolHandler handler(&t, [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();}, [](const std::string&){return std::string();});
+    ProtocolHandler handler(&t,
+        [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();},
+        [](const std::string&){return std::string();});
     handler.serve();
 }
 
@@ -151,6 +168,131 @@ TEST(ProtocolHandlerTest, MalformedImageHeader) {
     msg.resize(msg.size() + 3, 123);
     t.input_chunks.push(msg);
 
-    ProtocolHandler handler(&t, [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();}, [](const std::string&){return std::string();});
+    ProtocolHandler handler(&t,
+        [](const cv::Mat& m){return std::pair<cv::Mat,std::string>();},
+        [](const std::string&){return std::string();});
     handler.serve();
+}
+
+// ===================
+// Combined 0x03 tests
+// ===================
+
+TEST(ProtocolHandlerTest, CombinedValidTwoImagesAndJson) {
+    FakeTransport t;
+
+    cv::Mat red(1,2,CV_8UC3, cv::Scalar(0,0,255));
+    cv::Mat green(1,2,CV_8UC3, cv::Scalar(0,255,0));
+    uint32_t red_id = 10, green_id = 22;
+    std::string json_payload = "{\"msg\":\"hello from combined\"}";
+
+    std::vector<uint8_t> msg;
+    msg.push_back(static_cast<uint8_t>(ProtocolMessageType::Combined));
+    encode_uint32(msg, 2); // num images
+
+    append_combined_image_block(msg, red_id, red);
+    append_combined_image_block(msg, green_id, green);
+    encode_uint32(msg, static_cast<uint32_t>(json_payload.size()));
+    msg.insert(msg.end(), json_payload.begin(), json_payload.end());
+    t.input_chunks.push(msg);
+
+    bool combinedCbCalled = false;
+    ProtocolHandler handler(&t,
+        [](const cv::Mat&) { return std::pair<cv::Mat, std::string>(); },
+        [](const std::string&) { return std::string(); },
+        [&](const std::vector<std::pair<uint32_t, cv::Mat>>& imgs, const std::string& js)
+            -> std::pair<std::vector<std::pair<uint32_t, cv::Mat>>, std::string>
+        {
+            combinedCbCalled = true;
+            EXPECT_EQ(imgs.size(), 2u);
+            EXPECT_EQ(imgs[0].first, red_id);
+            EXPECT_EQ(imgs[1].first, green_id);
+            EXPECT_EQ(imgs[0].second.rows, 1);
+            EXPECT_EQ(imgs[1].second.cols, 2);
+            EXPECT_EQ(js, json_payload);
+            return {};
+        }
+    );
+    handler.serve();
+    EXPECT_TRUE(combinedCbCalled);
+}
+
+TEST(ProtocolHandlerTest, CombinedZeroImagesWithJson) {
+    FakeTransport t;
+
+    std::string json_payload = "{\"msg\":\"empty images\"}";
+    std::vector<uint8_t> msg;
+    msg.push_back(static_cast<uint8_t>(ProtocolMessageType::Combined));
+    encode_uint32(msg, 0); // 0 images
+    encode_uint32(msg, static_cast<uint32_t>(json_payload.size()));
+    msg.insert(msg.end(), json_payload.begin(), json_payload.end());
+    t.input_chunks.push(msg);
+
+    bool combinedCbCalled = false;
+    ProtocolHandler handler(&t,
+        [](const cv::Mat&) { return std::pair<cv::Mat, std::string>(); },
+        [](const std::string&) { return std::string(); },
+        [&](const std::vector<std::pair<uint32_t, cv::Mat>>& imgs, const std::string& js)
+            -> std::pair<std::vector<std::pair<uint32_t, cv::Mat>>, std::string>
+        {
+            combinedCbCalled = true;
+            EXPECT_TRUE(imgs.empty());
+            EXPECT_EQ(js, json_payload);
+            return {};
+        }
+    );
+    handler.serve();
+    EXPECT_TRUE(combinedCbCalled);
+}
+
+TEST(ProtocolHandlerTest, CombinedReplyWorks) {
+    FakeTransport t;
+
+    cv::Mat im(1,1,CV_8UC3, cv::Scalar(5,6,7));
+    std::string json_payload = "{\"foo\":1,\"bar\":2}";
+    std::vector<uint8_t> msg;
+    msg.push_back(static_cast<uint8_t>(ProtocolMessageType::Combined));
+    encode_uint32(msg, 1); // 1 image
+    append_combined_image_block(msg, 123, im);
+    encode_uint32(msg, static_cast<uint32_t>(json_payload.size()));
+    msg.insert(msg.end(), json_payload.begin(), json_payload.end());
+    t.input_chunks.push(msg);
+
+    ProtocolHandler handler(&t,
+        [](const cv::Mat&) { return std::pair<cv::Mat, std::string>(); },
+        [](const std::string&) { return std::string(); },
+        [&](const std::vector<std::pair<uint32_t, cv::Mat>>& imgs, const std::string& js)
+            -> std::pair<std::vector<std::pair<uint32_t, cv::Mat>>, std::string>
+        {
+            std::vector<std::pair<uint32_t, cv::Mat>> outimgs;
+            outimgs.push_back({777, imgs.at(0).second});
+            std::string outjson = "{\"ok\":true}";
+            return {outimgs, outjson};
+        }
+    );
+    handler.serve();
+
+    bool saw_comb = false, saw_json = false;
+    size_t i = 0;
+    while (i < t.written.size()) {
+        uint8_t fid = t.written[i++];
+        if(fid == static_cast<uint8_t>(ProtocolMessageType::Json)) {
+            saw_json = true;
+            if (i + 4 > t.written.size()) break;
+            uint32_t sz = 0;
+            std::memcpy(&sz, &t.written[i], 4);
+            sz = ntohl(sz);
+            i += 4;
+            if (i + sz > t.written.size()) break;
+            i += sz;
+            continue;
+        } else if(fid == static_cast<uint8_t>(ProtocolMessageType::Combined)) {
+            saw_comb = true;
+            break;
+        } else {
+            break;
+        }
+    }
+    EXPECT_TRUE(saw_comb);
+    EXPECT_TRUE(saw_json);
 }
