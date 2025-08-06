@@ -218,16 +218,16 @@ bool UnixSocketTransport::write_exact(const void* buffer, size_t size) {
         }
         total += static_cast<size_t>(w);
     }
-    std::cerr << "[write_exact] Success: wrote " << size << " bytes to fd=" << m_fd;
-    
-    // Print first 4 bytes (or less), as hex
-    size_t print_bytes = std::min(size_t(4), size);
-    const uint8_t* b = static_cast<const uint8_t*>(buffer);
-    std::cerr << " [first " << print_bytes << " bytes: ";
-    for (size_t i = 0; i < print_bytes; ++i) {
-        std::cerr << std::hex << std::setw(2) << std::setfill('0') << (unsigned)b[i] << " ";
-    }
-    std::cerr << "]\n";
+    //std::cerr << "[write_exact] Success: wrote " << size << " bytes to fd=" << m_fd;
+    //
+    //// Print first 4 bytes (or less), as hex
+    //size_t print_bytes = std::min(size_t(4), size);
+    //const uint8_t* b = static_cast<const uint8_t*>(buffer);
+    //std::cerr << " [first " << print_bytes << " bytes: ";
+    //for (size_t i = 0; i < print_bytes; ++i) {
+    //    std::cerr << std::hex << std::setw(2) << std::setfill('0') << (unsigned)b[i] << " ";
+    //}
+    //std::cerr << "]\n";
 
     return true;
 }
