@@ -21,9 +21,6 @@
 #include <algorithm>
 #include <deque>
 #include <cctype>
-#include <queue>
-#include <mutex>
-#include <condition_variable>
 #include <memory>
 
 using json = nlohmann::json;
@@ -158,33 +155,6 @@ std::string verify_correct_face(
     return "";
 }
 
-struct TakePictureEvent {
-    std::vector<std::pair<uint32_t, cv::Mat>> images;
-    std::string json_str;
-};
-
-class PictureEventQueue {
-public:
-    void push(const TakePictureEvent& ev) {
-        std::lock_guard<std::mutex> lock(mtx_);
-        queue_.push(ev);
-    }
-    bool try_pop(TakePictureEvent& out) {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (queue_.empty()) return false;
-        out = std::move(queue_.front());
-        queue_.pop();
-        return true;
-    }
-    void clear() {
-        std::lock_guard<std::mutex> lock(mtx_);
-        while (!queue_.empty()) queue_.pop();
-    }
-private:
-    std::queue<TakePictureEvent> queue_;
-    std::mutex mtx_;
-};
-
 std::map<std::string, std::string> parse_args(int argc, char** argv) {
     std::map<std::string, std::string> args;
     for (int i = 1; i < argc; i += 2) {
@@ -217,8 +187,6 @@ int main(int argc, char** argv) {
     cv::Mat current_input_image;
     json callback_data_json;
     std::string warning_message = "";
-
-    PictureEventQueue picture_queue;
 
     GlassesMode glasses_mode = GlassesMode::OFF;
     std::string glasses_model_path;
@@ -376,36 +344,10 @@ int main(int argc, char** argv) {
         GesturesRequester::DebugLevel::INFO);
     requester.set_gestures_list(loadedGestures);
 
-    requester.set_ask_to_take_picture_callback([&picture_queue, &current_input_image, &callback_data_json]() {
-        if (current_input_image.empty() || current_input_image.rows == 0 || current_input_image.cols == 0) {
-            std::cerr << "[Callback] No valid image for take picture event!\n";
-            return;
-        }
-        cv::Mat img_to_send = current_input_image;
-        if (img_to_send.type() != CV_8UC3) {
-            std::cerr << "[Callback] Warning: current_input_image is not CV_8UC3 (got type " << img_to_send.type() << "). Trying to convert...\n";
-            if (img_to_send.channels() == 1) {
-                cv::cvtColor(img_to_send, img_to_send, cv::COLOR_GRAY2BGR);
-            }
-            else {
-                std::cerr << "[Callback] Unsupported channel count, cannot send take picture image!\n";
-                return;
-            }
-        }
-        if (!img_to_send.isContinuous()) img_to_send = img_to_send.clone();
-        size_t expected_size = img_to_send.rows * img_to_send.cols * 3;
-        size_t actual_size = img_to_send.total() * img_to_send.elemSize();
-        if (actual_size != expected_size) {
-            std::cerr << "[Callback] Image buffer size mismatch! Not enqueuing.\n";
-            return;
-        }
-        TakePictureEvent ev;
-        ev.images = { {1, img_to_send} };
-        ev.json_str = R"({"takeAPicture":true})";
-        picture_queue.push(ev);
-
+    // -- This callback ONLY sets the takeAPicture flag! --
+    requester.set_ask_to_take_picture_callback([&callback_data_json]() {
         callback_data_json["takeAPicture"] = true;
-        std::cout << "[Callback] Take picture event ENQUEUED.\n";
+        std::cout << "[Callback] takeAPicture event set in callback_data_json.\n";
     });
 
     requester.set_report_alive_callback([&callback_data_json](bool alive) {
@@ -442,12 +384,39 @@ int main(int argc, char** argv) {
             }
         });
 
-    auto imageProcessingCallback = [&requester, &processor, &callback_data_json, &current_input_image, &warning_message](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
+    ProtocolHandler* handler_ptr = nullptr; // will point to actual handler
+
+    auto imageProcessingCallback = [&requester, &processor, &callback_data_json, &current_input_image, &warning_message, &handler_ptr](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
         current_input_image = inputImage.clone();
         processor.ProcessImage(inputImage);
         std::unordered_map<std::string, double> npoints;
         cv::Mat processedImage = requester.process_image(inputImage, 0, npoints, warning_message);
         std::string callback_data = callback_data_json.empty() ? "" : callback_data_json.dump();
+
+        // --- (Safe place!) Send take picture combined message if needed ------
+        if (callback_data_json.contains("takeAPicture") && callback_data_json["takeAPicture"] && handler_ptr != nullptr) {
+            if (!current_input_image.empty()) {
+                cv::Mat img_to_send = current_input_image;
+                if (img_to_send.type() != CV_8UC3) {
+                    std::cerr << "[CombinedMsg] Image not CV_8UC3 (was type " << img_to_send.type() << "), converting...\n";
+                    if (img_to_send.channels() == 1) {
+                        cv::cvtColor(img_to_send, img_to_send, cv::COLOR_GRAY2BGR);
+                    }
+                }
+                if (!img_to_send.isContinuous()) img_to_send = img_to_send.clone();
+                size_t expected_size = img_to_send.rows * img_to_send.cols * 3;
+                size_t actual_size = img_to_send.total() * img_to_send.elemSize();
+                if (actual_size == expected_size) {
+                    std::string json_str = R"({"takeAPicture":true})";
+                    std::vector<std::pair<uint32_t, cv::Mat>> images = { {1, img_to_send} };
+                    handler_ptr->send_combined(images, json_str);
+                    std::cout << "[CombinedMsg] Sent take picture combined message.\n";
+                } else {
+                    std::cerr << "[CombinedMsg] Image size mismatch! Not sending.\n";
+                }
+            }
+        }
+
         callback_data_json.clear();
         return { processedImage, callback_data };
     };
@@ -498,19 +467,12 @@ int main(int argc, char** argv) {
             imageProcessingCallback,
             dataProcessingCallback
         );
+        handler_ptr = &handler; // So lambda can send combined
 
         std::string why_exit;
-        while (true) {
-            bool ok = handler.handle_one_message(why_exit);
-            TakePictureEvent ev;
-            while (picture_queue.try_pop(ev)) {
-                std::cout << "[Server] Sending deferred take picture event (combined message)...\n";
-                handler.send_combined(ev.images, ev.json_str);
-            }
-            if (!ok) break;
-        }
+        while (handler.handle_one_message(why_exit)) {}
         std::cerr << "Session ended: " << why_exit << "\n";
-        picture_queue.clear();
+        handler_ptr = nullptr;
     }
     return 0;
 }
