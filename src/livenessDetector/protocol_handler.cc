@@ -126,11 +126,11 @@ bool ProtocolHandler::send_one_combined_image(uint32_t image_id, const cv::Mat& 
     uint32_t net_rows = htonl(rows);
     uint32_t net_cols = htonl(cols);
 
-    if (!write_exact(&net_id, 4))   return false;
-    if (!write_exact(&net_size, 4)) return false;
-    if (!write_exact(&net_rows, 4)) return false;
-    if (!write_exact(&net_cols, 4)) return false;
-    if (!write_exact(img.data, frame_size)) return false;
+    if (!write_exact(&net_id, 4))   { std::cerr << "[send_one_combined_image] Failed to write image id\n"; return false; }
+    if (!write_exact(&net_size, 4)) { std::cerr << "[send_one_combined_image] Failed to write image size\n"; return false; }
+    if (!write_exact(&net_rows, 4)) { std::cerr << "[send_one_combined_image] Failed to write image rows\n"; return false; }
+    if (!write_exact(&net_cols, 4)) { std::cerr << "[send_one_combined_image] Failed to write image cols\n"; return false; }
+    if (!write_exact(img.data, frame_size)) { std::cerr << "[send_one_combined_image] Failed to write image data\n"; return false; }
     return true;
 }
 

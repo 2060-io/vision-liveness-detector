@@ -59,8 +59,11 @@ public:
     // Each image gets a uint32_t id and is a (id, image) pair.
     bool send_combined(const std::vector<std::pair<uint32_t, cv::Mat>>& images,
                         const std::string& json);
+                        
+    // Handle one full incoming message; returns false on fatal I/O or protocol error.
+    bool handle_one_message(std::string& error_out);
 
-private:
+    private:
     Transport* m_transport;
     ImageProcessingCallback m_img_cb;
     DataProcessingCallback  m_data_cb;
@@ -70,8 +73,6 @@ private:
     bool read_exact(void* buf, size_t size);
     bool write_exact(const void* buf, size_t size);
 
-    // Handle one full incoming message; returns false on fatal I/O or protocol error.
-    bool handle_one_message(std::string& error_out);
 
     // Helpers for handling combined messages
     bool send_one_combined_image(uint32_t image_id, const cv::Mat& img);

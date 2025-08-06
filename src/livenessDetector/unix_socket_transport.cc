@@ -10,6 +10,8 @@
 #include <cassert>
 #include <sys/stat.h>
 #include <memory>
+#include <iostream>
+#include <iomanip>
 
 
 UnixSocketTransport::UnixSocketTransport(const std::string& socket_path)
@@ -209,10 +211,24 @@ bool UnixSocketTransport::write_exact(const void* buffer, size_t size) {
         } while (w == -1 && errno == EINTR);
 #endif
         if (w <= 0) {
+            std::cerr << "[write_exact] write error: "
+                      << strerror(errno) << " (errno=" << errno << "), "
+                      << "fd=" << m_fd << ", after writing " << total << " of " << size << " bytes.\n";
             return false;
         }
         total += static_cast<size_t>(w);
     }
+    std::cerr << "[write_exact] Success: wrote " << size << " bytes to fd=" << m_fd;
+    
+    // Print first 4 bytes (or less), as hex
+    size_t print_bytes = std::min(size_t(4), size);
+    const uint8_t* b = static_cast<const uint8_t*>(buffer);
+    std::cerr << " [first " << print_bytes << " bytes: ";
+    for (size_t i = 0; i < print_bytes; ++i) {
+        std::cerr << std::hex << std::setw(2) << std::setfill('0') << (unsigned)b[i] << " ";
+    }
+    std::cerr << "]\n";
+
     return true;
 }
 
