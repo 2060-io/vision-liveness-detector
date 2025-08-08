@@ -5,7 +5,8 @@
 #include "livenessDetector/face_processor.h"
 #include "livenessDetector/nlohmann/json.hpp"
 
-#include <opencv2/opencv.hpp> 
+#include <opencv2/opencv.hpp>
+#include <opencv2/dnn.hpp>
 #include <iostream>
 #include <vector>
 #include <set>
@@ -16,9 +17,93 @@
 #include <functional>
 #include <random>
 #include <algorithm>
+#include <deque>
+#include <cctype>
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
+
+// Glasses detection mode
+enum class GlassesMode { OFF, WARNING_ONLY, ERROR };
+
+GlassesMode parse_glasses_mode(const std::string& mode) {
+    std::string u(mode);
+    std::transform(u.begin(), u.end(), u.begin(), ::toupper);
+    if (u == "OFF") return GlassesMode::OFF;
+    if (u == "WARNING_ONLY") return GlassesMode::WARNING_ONLY;
+    if (u == "ERROR") return GlassesMode::ERROR;
+    // default
+    return GlassesMode::OFF;
+}
+
+// === Glasses detector manager ===
+// Simple wrapper class for filtered glasses detection
+class GlassesDetectorManager {
+public:
+    explicit GlassesDetectorManager(const std::string& model_path, int filter_frames=30)
+        : filter_size(filter_frames), model_loaded(false)
+    {
+        try {
+            net = cv::dnn::readNetFromONNX(model_path);
+            model_loaded = !net.empty();
+        } catch (const std::exception& ex) {
+            std::cerr << "[GlassesDetector] Model load error: " << ex.what() << std::endl;
+            model_loaded = false;
+        }
+    }
+    bool is_loaded() const { return model_loaded; }
+
+    bool detect_and_update(const cv::Mat& image) {
+        // Use filtered detection
+        bool is_glasses = detect(image);
+        glasses_history.push_back(is_glasses);
+        if ((int)glasses_history.size() > filter_size)
+            glasses_history.pop_front();
+
+        int true_count = std::count(glasses_history.begin(), glasses_history.end(), true);
+        int false_count = glasses_history.size() - true_count;
+        // Majority wins (note: for tie, defaults to false/no-glasses)
+        return (true_count > false_count);
+    }
+
+private:
+    cv::dnn::Net net;
+    int filter_size;
+    bool model_loaded;
+    std::deque<bool> glasses_history;
+    // preprocess and run ONNX on the whole frame
+    bool detect(const cv::Mat& image) {
+        if (!model_loaded || image.empty())
+            return false;
+        cv::Mat input;
+        cv::cvtColor(image, input, cv::COLOR_BGR2RGB);
+        cv::resize(input, input, cv::Size(160, 160));
+        input.convertTo(input, CV_32F);
+        cv::Mat nchwBlob = cv::dnn::blobFromImage(input); // (1, 3, 160, 160)
+        // NHWC
+        cv::Mat nhwcBlob = nchw_to_nhwc(nchwBlob);
+        net.setInput(nhwcBlob);
+        float result = net.forward().at<float>(0, 0);
+        //std::cout << "[GlassesDetector] model raw output: " << result << std::endl;
+        return (result < 0.0f);
+    }
+    // Convert from NCHW Mat to NHWC
+    cv::Mat nchw_to_nhwc(const cv::Mat& nchwBlob) {
+        CV_Assert(nchwBlob.dims == 4 && nchwBlob.type() == CV_32F);
+        int N = nchwBlob.size[0], C = nchwBlob.size[1], H = nchwBlob.size[2], W = nchwBlob.size[3];
+        cv::Mat nhwcBlob = cv::Mat::zeros(N, H*W*C, CV_32F);
+        const float* src = reinterpret_cast<const float*>(nchwBlob.data);
+        float* dst = reinterpret_cast<float*>(nhwcBlob.data);
+        for (int n = 0; n < N; ++n)
+          for (int h = 0; h < H; ++h)
+            for (int w = 0; w < W; ++w)
+              for (int c = 0; c < C; ++c)
+                dst[n*H*W*C + h*W*C + w*C + c] = src[n*C*H*W + c*H*W + h*W + w];
+        nhwcBlob = nhwcBlob.reshape(1, std::vector<int>{N, H, W, C});
+        return nhwcBlob;
+    }
+};
+
 
 // Function to verify if the detected face satisfies all constraints.
 // Returns an empty string if OK, otherwise a warning message.
@@ -115,6 +200,18 @@ int main(int argc, char** argv) {
 
     auto args = parse_args(argc, argv);
 
+    // Parse glasses detector arg (default: OFF)
+    GlassesMode glasses_mode = GlassesMode::OFF;
+    std::string glasses_model_path;
+    if (args.find("--glasses_detector") != args.end()) {
+        glasses_mode = parse_glasses_mode(args["--glasses_detector"]);
+    }
+    if (args.find("--glasses_model_path") != args.end()) {
+        glasses_model_path = args["--glasses_model_path"];
+    } else {
+        glasses_model_path = "glasses_model.onnx"; // default/fallback
+    }
+
     // List of required argument names (without leading "--" since parse_args strips it)
     std::vector<std::string> required_keys = {
         "--model_path", "--gestures_folder_path", "--language", "--socket_path", "--num_gestures", "--font_path"
@@ -137,7 +234,10 @@ int main(int argc, char** argv) {
                   << " --num_gestures <int>"
                   << " --font_path <path>"
                   << " [--locales_paths <path1>:<path2>]"
-                  << " [--gestures_list <gesture1>:<gesture2>:...]\n";
+                  << " [--gestures_list <gesture1>:<gesture2>:...]"
+                  << " [--glasses_detector OFF|WARNING_ONLY|ERROR]"
+                  << " [--glasses_model_path <path_to_glasses_onnx>]"
+                  << "\n";
         return EXIT_FAILURE;
     }
 
@@ -152,12 +252,6 @@ int main(int argc, char** argv) {
     std::vector<std::string> locales_paths;
     if (args.find("--locales_paths") != args.end())
         locales_paths = split_paths(args["--locales_paths"]);
-    
-    std::set<std::string> allowed_gestures;
-    if (args.find("--gestures_list") != args.end()) {
-        auto lst = split_paths(args["--gestures_list"]); // uses ':' by default
-        allowed_gestures = std::set<std::string>(lst.begin(), lst.end());
-    }
 
     for (const auto& folder : gestures_folders)
         locales_paths.push_back(folder + "/locales");
@@ -169,45 +263,86 @@ int main(int argc, char** argv) {
 
     std::string warning_message = "";
 
-    // Load gesture definitions from JSON files.
-    std::vector<std::string> gestureFiles;
+    // ===========================
+    // GESTURE LOADING LOGIC START
+    // ===========================
+    // Parse gestures_list if present (ordered so no set)
+    std::vector<std::string> gestures_list;
+    if (args.find("--gestures_list") != args.end()) {
+        gestures_list = split_paths(args["--gestures_list"]);
+    }
 
+    // Build map: gesture_name -> full_path
+    std::unordered_map<std::string, std::string> gesture_name2path;
     for (const auto& folder : gestures_folders) {
         try {
             for (const auto& entry : fs::directory_iterator(folder)) {
                 if (entry.path().extension() == ".json") {
-                    std::string basename = entry.path().stem().string(); // without extension
-                    if (allowed_gestures.empty() || allowed_gestures.count(basename) > 0) {
-                        gestureFiles.push_back(entry.path().string());
+                    auto stem = entry.path().stem().string();
+                    // Only record first occurrence per gesture name
+                    if (!gesture_name2path.count(stem)) {
+                        gesture_name2path[stem] = entry.path().string();
                     }
                 }
             }
         } catch (fs::filesystem_error& e) {
             std::cerr << "Error accessing the gestures folder: " << folder << ": " << e.what() << "\n";
-            // Continue trying other folders (don't return yet);
+            // Continue trying other folders
+        }
+    }
+
+    std::vector<std::string> gestureFiles;
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    if (gestures_list.empty()) {
+        // No gestures_list: pick num_gestures at random from all available
+        for (const auto& kv : gesture_name2path)
+            gestureFiles.push_back(kv.second);
+
+        if (num_gestures > static_cast<int>(gestureFiles.size())) {
+            std::cerr << "Requested number of gestures exceeds available gestures. Exiting application.\n";
+            return EXIT_FAILURE;
+        }
+        std::shuffle(gestureFiles.begin(), gestureFiles.end(), g);
+        gestureFiles.resize(num_gestures);
+    } else {
+        // gestures_list provided: build explicit ordered list
+        std::vector<std::string> explicitListPaths;
+        for (const auto& name : gestures_list) {
+            auto it = gesture_name2path.find(name);
+            if (it == gesture_name2path.end()) {
+                std::cerr << "Gesture '" << name << "' not found in folders. Exiting.\n";
+                return EXIT_FAILURE;
+            }
+            explicitListPaths.push_back(it->second);
+        }
+
+        if (static_cast<int>(explicitListPaths.size()) == num_gestures) {
+            // Use exact list, in order, no shuffle!
+            gestureFiles = explicitListPaths;
+        } else if (static_cast<int>(explicitListPaths.size()) > num_gestures) {
+            // Randomly pick num_gestures from gestures_list
+            std::shuffle(explicitListPaths.begin(), explicitListPaths.end(), g);
+            explicitListPaths.resize(num_gestures);
+            gestureFiles = explicitListPaths;
+        } else {
+            std::cerr << "gestures_list contains fewer gestures (" << explicitListPaths.size()
+                      << ") than num_gestures (" << num_gestures << "). Exiting.\n";
+            return EXIT_FAILURE;
         }
     }
 
     if (gestureFiles.empty()) {
-        std::cerr << "No gesture JSON files found in the specified folder. Exiting application.\n";
+        std::cerr << "No gesture JSON files found in the specified folder(s). Exiting application.\n";
         return EXIT_FAILURE;
     }
+    // =========================
+    // GESTURE LOADING LOGIC END
+    // =========================
 
-    // Ensure we do not attempt to select more gestures than available
-    if (num_gestures > static_cast<int>(gestureFiles.size())) {
-        std::cerr << "Requested number of gestures exceeds available gestures. Exiting application.\n";
-        return EXIT_FAILURE;
-    }
-
-    // Randomly shuffle and select the specified number of gestures
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(gestureFiles.begin(), gestureFiles.end(), g);
-
-    // Select only the specified number of gestures
-    gestureFiles.resize(num_gestures);
-
-    // Create an instance of GestureDetector
+    // Load gesture definitions from JSON
+    // (unchanged)
     GestureDetector detector;
     std::vector<GestureDetector::AddResult> loadedGestures;
 
@@ -229,6 +364,16 @@ int main(int argc, char** argv) {
 
     TranslationManager translator(language, locales_paths);
 
+    // Init glasses detector
+    std::unique_ptr<GlassesDetectorManager> glasses_detector;
+    if (glasses_mode != GlassesMode::OFF) {
+        glasses_detector = std::make_unique<GlassesDetectorManager>(glasses_model_path, 30);
+        if (!glasses_detector->is_loaded()) {
+            std::cerr << "Failed to load glasses model from " << glasses_model_path << "\n";
+            return EXIT_FAILURE;
+        }
+    }
+
     // Create a GesturesRequester.
     GesturesRequester requester(static_cast<int>(loadedGestures.size()),
                                 &detector,
@@ -241,58 +386,67 @@ int main(int argc, char** argv) {
     // Capture the local variables by reference in the lambda
     requester.set_ask_to_take_picture_callback([&callback_data_json]() {
         std::cout << "[Callback] Ask to take picture triggered.\n";
-        // Add or update the 'takeAPicture' key in the callback_data_json object
         callback_data_json["takeAPicture"] = true;
     });
 
     requester.set_report_alive_callback([&callback_data_json](bool alive) {
         std::cout << "[Callback] GesturesRequester is " << (alive ? "alive" : "not alive") << ".\n";
-        // Add or update the 'reportAlive' key in the callback_data_json object
         callback_data_json["reportAlive"] = alive;
     });
 
     // Create a FaceProcessor
     FaceProcessor processor(model_path);
     processor.SetDoProcessImage(true);
-    processor.SetCallback([&detector, &warning_message, &translator](const std::map<std::string, float>& blendshapes,
-        const std::map<std::string, float>& transformationValues) {
-            // Create an unordered_map to hold the converted blendshapes
-            std::unordered_map<std::string, double> convertedBlendshapes;
-            // Convert each element type
-            for (const auto& pair : blendshapes) {
-                convertedBlendshapes[pair.first] = static_cast<double>(pair.second);
-            }
-            // Call process_signals with the converted map
-            detector.process_signals(convertedBlendshapes);
-            warning_message = verify_correct_face(transformationValues, &translator);
+
+    // Updated callback with glasses logic
+    processor.SetCallback([&detector, &warning_message, &translator, &glasses_detector, glasses_mode, &processor]
+        (const std::map<std::string, float>& blendshapes,
+         const std::map<std::string, float>& transformationValues) {
+
+        // Run gestures detector
+        std::unordered_map<std::string, double> convertedBlendshapes;
+        for (const auto& pair : blendshapes)
+            convertedBlendshapes[pair.first] = static_cast<double>(pair.second);
+        detector.process_signals(convertedBlendshapes);
+
+        // Glasses detection (with filter)
+        bool detected_glasses = false;
+        if (glasses_detector && (glasses_mode == GlassesMode::WARNING_ONLY || glasses_mode == GlassesMode::ERROR)) {
+            const cv::Mat& face_img = processor.GetLastInputImage();
+            if (!face_img.empty())
+                detected_glasses = glasses_detector->detect_and_update(face_img);
+        }
+
+        // Compose warning messages
+        if (glasses_mode == GlassesMode::WARNING_ONLY && detected_glasses) {
+            warning_message = "Remove the glasses";
+        } else if (glasses_mode == GlassesMode::ERROR && detected_glasses) {
+            warning_message = "Detected glasses. Aborting liveness detection.";
+            // TODO: trigger shutdown/abort logic here
+        } else {
+            warning_message = verify_correct_face(transformationValues, &translator, detected_glasses);
+        }
     });
 
-    // Create a UnixSocketServer using the provided socket path.
+    // Image processing callback (remains unchanged)
     auto imageProcessingCallback = [&requester, &processor, &callback_data_json, &warning_message](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
         processor.ProcessImage(inputImage);
-
-        std::unordered_map<std::string, double> npoints;  // empty points; extend as needed!
+        std::unordered_map<std::string, double> npoints;
         cv::Mat processedImage = requester.process_image(inputImage, 0, npoints, warning_message);
-
-        // Serialize the accumulated JSON object to a string
         std::string callback_data = callback_data_json.empty() ? "" : callback_data_json.dump();
         callback_data_json.clear();
-
         return {processedImage, callback_data};
     };
- 
+
     auto dataProcessingCallback = [&warning_message, &requester](const std::string& json_str) -> std::string {
         try {
             auto j = nlohmann::json::parse(json_str);
-    
-            // Check all required fields before proceeding
             if (j.contains("action") && j["action"] == "set" &&
                 j.contains("variable") && j["variable"].is_string() &&
                 j.contains("value") && j["value"].is_string())
             {
                 const std::string& variable = j["variable"];
                 const std::string& value = j["value"];
-    
                 if (variable == "warning_message") {
                     warning_message = value;
                     std::cout << "[Config] Set warning_message to: " << warning_message << std::endl;

@@ -47,6 +47,7 @@ FaceProcessor::~FaceProcessor() {
 }
 
 void FaceProcessor::ProcessImage(const cv::Mat& img) {
+    last_input_image_ = img.clone();
     if (do_process_image_ && landmarker_) {
         auto input_frame = std::make_shared<mediapipe::ImageFrame>(mediapipe::ImageFormat::SRGB, img.cols, img.rows, mediapipe::ImageFrame::kDefaultAlignmentBoundary);
         cv::Mat input_frame_mat = mediapipe::formats::MatView(input_frame.get());

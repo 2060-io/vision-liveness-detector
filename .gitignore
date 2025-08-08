@@ -8,3 +8,4 @@ wrappers/python/liveness_detector/gestures
 wrappers/python/liveness_detector/*.json
 .venv
 tmp
+.DS_Store

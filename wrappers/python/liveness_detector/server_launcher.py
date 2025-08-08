@@ -15,7 +15,7 @@ def get_server_executable_path():
     if system == "linux" and machine == "x86_64":
         return "./server/livenessDetectorServer"
     elif system == "windows" and machine.endswith("64"):
-        return "./server/livenessDetectorServer.exe"  # Adjust the directory names as necessary
+        return "./server/livenessDetectorServer.exe"
     elif system == "darwin" and machine == "arm64":
         return "./server/livenessDetectorServer"
     else:
@@ -29,20 +29,24 @@ class GestureServerClient:
         num_gestures, 
         extra_gestures_paths=None, 
         extra_locales_paths=None, 
-        gestures_list=None
+        gestures_list=None,
+        glasses_detector_mode="OFF",
+        glasses_model_path=os.path.join(os.path.dirname(__file__),'./model/glasses_model.onnx')
     ):
         self.server_executable_path = os.path.join(os.path.dirname(__file__), get_server_executable_path())
         self.model_path = os.path.join(os.path.dirname(__file__),'./model/face_landmarker.task')
         self.gestures_folder_path = os.path.join(os.path.dirname(__file__),'./gestures')
-        self.font_path = os.path.join(os.path.dirname(__file__),'./fonts/DejaVuSans.ttf') #Set the dafault font
+        self.font_path = os.path.join(os.path.dirname(__file__),'./fonts/DejaVuSans.ttf')
         self.language = language
         self.socket_path = socket_path
         self.num_gestures = num_gestures
 
-        # New parameters, default to empty list if not provided
         self.extra_gestures_paths = extra_gestures_paths if extra_gestures_paths else []
         self.extra_locales_paths = extra_locales_paths if extra_locales_paths else []
         self.gestures_list = gestures_list if gestures_list else []
+
+        self.glasses_detector_mode = glasses_detector_mode if glasses_detector_mode else "OFF"
+        self.glasses_model_path = glasses_model_path
 
         self.server_process = None
         self.client_socket = None
@@ -110,6 +114,18 @@ class GestureServerClient:
         if gestures_list_arg:
             server_command.extend(["--gestures_list", gestures_list_arg])
 
+        # ----- Glasses detection args -----
+        # Only add if not OFF, or if model path is provided
+        mode_str = str(self.glasses_detector_mode).strip().upper()
+        if mode_str != "OFF":
+            server_command.extend(["--glasses_detector", mode_str])
+            if self.glasses_model_path:
+                server_command.extend(["--glasses_model_path", self.glasses_model_path])
+        elif self.glasses_model_path:
+            # If only model path given, add it explicitly (mode is OFF)
+            server_command.extend(["--glasses_detector", "OFF"])
+            server_command.extend(["--glasses_model_path", self.glasses_model_path])
+
         print("Launching server with:", " ".join(server_command))
         self.server_process = subprocess.Popen(server_command)
 
@@ -146,7 +162,7 @@ class GestureServerClient:
         self.client_socket.sendall((0x02).to_bytes(1, 'big'))
         self.client_socket.sendall(len(data).to_bytes(4, 'big'))
         self.client_socket.sendall(data)
-    
+
     def set_warning_message(self, text):
         """ Send a command to the server to set the warning message. """
         if self.client_socket is None:
@@ -160,7 +176,7 @@ class GestureServerClient:
         self.client_socket.sendall((0x02).to_bytes(1, 'big'))
         self.client_socket.sendall(len(data).to_bytes(4, 'big'))
         self.client_socket.sendall(data)
-    
+
     def process_frame(self, frame):
         """ Send a frame to the server and receive the processed frame. """
         if self.client_socket is None:

@@ -1,0 +1,21 @@
+{
+    "gestureId": "nopictures",
+    "label": "No Pictures",
+    "icon_path": "",
+    "signal_index": 2,
+    "total_recommended_max_time": 9000,
+    "take_picture_at_the_end": false,
+    "randomize_step_picture": false,
+    "instructions": [
+        {
+            "instruction_type": "threshold",
+            "move_to_next_type": "higher",
+            "value": 1.5
+        },
+        {
+            "instruction_type": "threshold",
+            "move_to_next_type": "higher",
+            "value": 7.0
+        }
+    ]
+}
