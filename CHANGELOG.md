@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/2060-io/vision-liveness-detector/compare/v0.5.0...v0.6.0) (2025-08-08)
+
+
+### Features
+
+* better gesture definitions ([#19](https://github.com/2060-io/vision-liveness-detector/issues/19)) ([ba2ea18](https://github.com/2060-io/vision-liveness-detector/commit/ba2ea18850a2a2e85b1e263480b2e54f745915b1))
+
 ## [0.5.0](https://github.com/2060-io/vision-liveness-detector/compare/v0.4.0...v0.5.0) (2025-07-14)
 
 
