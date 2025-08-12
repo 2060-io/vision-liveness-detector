@@ -2,6 +2,8 @@ cc_binary(
     name = "livenessDetectorServer",
     srcs = ["livenessDetectorServer.cc"],
     deps = [
+        "//livenessDetector:glasses_detector",
+        "//livenessDetector:face_verification",
         "//livenessDetector:unix_socket_transport",
         "//livenessDetector:protocol_handler",
         "//livenessDetector:gesture_detector",
@@ -12,6 +14,11 @@ cc_binary(
         "//third_party:opencv",
     ],
     copts = ["-std=c++17"],       # enable C++17 for <filesystem>
-    linkopts = ["-lstdc++fs"],    # pull in the filesystem library
+    linkopts = select({
+        "@platforms//os:linux": ["-lstdc++fs"],
+        "@platforms//os:windows": [],
+        "@platforms//os:osx": [],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
 )

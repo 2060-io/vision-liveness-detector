@@ -7,6 +7,10 @@
 #include "livenessDetector/unix_socket_transport.h"
 #include "livenessDetector/protocol_handler.h"
 
+#include "livenessDetector/glasses_detector.h"
+#include "livenessDetector/face_verification.h"
+
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
 #include <iostream>
@@ -25,135 +29,6 @@
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
-
-// Glasses detection mode
-enum class GlassesMode { OFF, WARNING_ONLY, ERROR };
-
-GlassesMode parse_glasses_mode(const std::string& mode) {
-    std::string u(mode);
-    std::transform(u.begin(), u.end(), u.begin(), ::toupper);
-    if (u == "OFF") return GlassesMode::OFF;
-    if (u == "WARNING_ONLY") return GlassesMode::WARNING_ONLY;
-    if (u == "ERROR") return GlassesMode::ERROR;
-    return GlassesMode::OFF;
-}
-
-// --- GlassesDetectorManager is UNCHANGED from your version ---
-class GlassesDetectorManager {
-public:
-    explicit GlassesDetectorManager(const std::string& model_path, int filter_frames = 30)
-        : filter_size(filter_frames), model_loaded(false)
-    {
-        try {
-            net = cv::dnn::readNetFromONNX(model_path);
-            model_loaded = !net.empty();
-        }
-        catch (const std::exception& ex) {
-            std::cerr << "[GlassesDetector] Model load error: " << ex.what() << std::endl;
-            model_loaded = false;
-        }
-    }
-    bool is_loaded() const { return model_loaded; }
-
-    bool detect_and_update(const cv::Mat& image) {
-        bool is_glasses = detect(image);
-        glasses_history.push_back(is_glasses);
-        if ((int)glasses_history.size() > filter_size)
-            glasses_history.pop_front();
-
-        int true_count = std::count(glasses_history.begin(), glasses_history.end(), true);
-        int false_count = glasses_history.size() - true_count;
-        return (true_count > false_count);
-    }
-
-private:
-    cv::dnn::Net net;
-    int filter_size;
-    bool model_loaded;
-    std::deque<bool> glasses_history;
-
-    bool detect(const cv::Mat& image) {
-        if (!model_loaded || image.empty())
-            return false;
-        cv::Mat input;
-        cv::cvtColor(image, input, cv::COLOR_BGR2RGB);
-        cv::resize(input, input, cv::Size(160, 160));
-        input.convertTo(input, CV_32F);
-        cv::Mat nchwBlob = cv::dnn::blobFromImage(input); // (1, 3, 160, 160)
-        cv::Mat nhwcBlob = nchw_to_nhwc(nchwBlob);
-        net.setInput(nhwcBlob);
-        float result = net.forward().at<float>(0, 0);
-        return (result < 0.0f);
-    }
-
-    cv::Mat nchw_to_nhwc(const cv::Mat& nchwBlob) {
-        CV_Assert(nchwBlob.dims == 4 && nchwBlob.type() == CV_32F);
-        int N = nchwBlob.size[0], C = nchwBlob.size[1], H = nchwBlob.size[2], W = nchwBlob.size[3];
-        cv::Mat nhwcBlob = cv::Mat::zeros(N, H * W * C, CV_32F);
-        const float* src = reinterpret_cast<const float*>(nchwBlob.data);
-        float* dst = reinterpret_cast<float*>(nhwcBlob.data);
-        for (int n = 0; n < N; ++n)
-            for (int h = 0; h < H; ++h)
-                for (int w = 0; w < W; ++w)
-                    for (int c = 0; c < C; ++c)
-                        dst[n * H * W * C + h * W * C + w * C + c] = src[n * C * H * W + c * H * W + h * W + w];
-        nhwcBlob = nhwcBlob.reshape(1, std::vector<int>{N, H, W, C});
-        return nhwcBlob;
-    }
-};
-
-
-std::string verify_correct_face(
-    const std::map<std::string, float>& face_square_normalized_points,
-    TranslationManager* translator,
-    bool glasses = false,
-    float percentage_min_face_width = 0.1f,
-    float percentage_max_face_width = 0.5f,
-    float percentage_min_face_height = 0.1f,
-    float percentage_max_face_height = 0.7f,
-    float percentage_center_allowed_offset = 0.25f
-) {
-    const std::string wrong_face_width_message = translator->translate("warning.wrong_face_width_message");
-    const std::string wrong_face_height_message = translator->translate("warning.wrong_face_height_message");
-    const std::string wrong_face_center_message = translator->translate("warning.wrong_face_center_message");
-    const std::string face_not_detected_message = translator->translate("warning.face_not_detected_message");
-    const std::string face_with_glasses_message = translator->translate("warning.face_with_glasses_message");
-
-    const char* required_keys[] = { "Top Square", "Left Square", "Right Square", "Bottom Square" };
-    for (const auto& key : required_keys) {
-        if (face_square_normalized_points.find(key) == face_square_normalized_points.end()) {
-            return face_not_detected_message;
-        }
-    }
-    if (glasses) {
-        return face_with_glasses_message;
-    }
-    float topSquare = face_square_normalized_points.at("Top Square");
-    float leftSquare = face_square_normalized_points.at("Left Square");
-    float rightSquare = face_square_normalized_points.at("Right Square");
-    float bottomSquare = face_square_normalized_points.at("Bottom Square");
-
-    if (topSquare < 0 || leftSquare < 0 || rightSquare < 0 || bottomSquare < 0) {
-        return face_not_detected_message;
-    }
-    float face_width = rightSquare - leftSquare;
-    float face_height = bottomSquare - topSquare;
-    float face_center_x = (rightSquare + leftSquare) / 2.0f;
-    float face_center_y = (topSquare + bottomSquare) / 2.0f;
-
-    if (!(percentage_min_face_width <= face_width && face_width <= percentage_max_face_width)) {
-        return wrong_face_width_message;
-    }
-    if (!(percentage_min_face_height <= face_height && face_height <= percentage_max_face_height)) {
-        return wrong_face_height_message;
-    }
-    float center = 0.5f;
-    if (!(center - percentage_center_allowed_offset <= face_center_x && face_center_x <= center + percentage_center_allowed_offset) ||
-        !(center - percentage_center_allowed_offset <= face_center_y && face_center_y <= center + percentage_center_allowed_offset)) {
-        return wrong_face_center_message;
-    }
-    return "";
-}
 
 std::map<std::string, std::string> parse_args(int argc, char** argv) {
     std::map<std::string, std::string> args;

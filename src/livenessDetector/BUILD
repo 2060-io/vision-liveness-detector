@@ -102,6 +102,29 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_library(
+    name = "glasses_detector",
+    srcs = ["glasses_detector.cc"],
+    hdrs = ["glasses_detector.h"],
+    deps = [
+        "//third_party:opencv",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+cc_library(
+    name = "face_verification",
+    srcs = ["face_verification.cc"],
+    hdrs = ["face_verification.h"],
+    deps = [
+        ":translation_manager",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+
+
+
 cc_test(
     name = "protocol_handler_test",
     srcs = ["protocol_handler_test.cc"],
