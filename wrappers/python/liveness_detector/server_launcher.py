@@ -23,7 +23,6 @@ def get_server_executable_path():
     else:
         sys.exit(f"Unsupported platform: {system} {machine}")
 
-
 class GestureServerClient:
     """
     Client for the liveness detector server, using a pluggable transport and protocol handler.
@@ -38,7 +37,9 @@ class GestureServerClient:
         extra_locales_paths=None,
         gestures_list=None,
         glasses_detector_mode="OFF",
-        glasses_model_path=None
+        glasses_model_path=None,
+        face_det_model_path=None,
+        max_faceless_attempts=None
     ):
         # Set up resources and server args
         self.server_executable_path = os.path.join(os.path.dirname(__file__), get_server_executable_path())
@@ -55,6 +56,15 @@ class GestureServerClient:
 
         self.glasses_detector_mode = glasses_detector_mode if glasses_detector_mode else "OFF"
         self.glasses_model_path = glasses_model_path or os.path.join(os.path.dirname(__file__), './model/glasses_model.onnx')
+
+        # Face detector path and max_attempts
+        # If no face_det_model_path but max_faceless_attempts is given, use ./model/haarcascade_frontalface_default.xml
+        if face_det_model_path is None and max_faceless_attempts is not None:
+            self.face_det_model_path = os.path.join(os.path.dirname(__file__), './model/haarcascade_frontalface_default.xml')
+        else:
+            self.face_det_model_path = face_det_model_path
+
+        self.max_faceless_attempts = max_faceless_attempts  # If set, pass to server
 
         self.server_process = None
         self.transport = None  # Will be set to UnixSocketTransport or other
@@ -132,6 +142,7 @@ class GestureServerClient:
             server_command.extend(["--locales_paths", locales_paths_arg])
         if gestures_list_arg:
             server_command.extend(["--gestures_list", gestures_list_arg])
+
         # Glasses detector handling
         mode_str = str(self.glasses_detector_mode).strip().upper()
         if mode_str != "OFF":
@@ -142,6 +153,14 @@ class GestureServerClient:
             # If only model path given, add it explicitly (mode is OFF)
             server_command.extend(["--glasses_detector", "OFF"])
             server_command.extend(["--glasses_model_path", self.glasses_model_path])
+
+        # Add face detector path if provided
+        if self.face_det_model_path:
+            server_command.extend(["--face_det_model_path", self.face_det_model_path])
+
+        # Add max faceless attempts if provided
+        if self.max_faceless_attempts is not None:
+            server_command.extend(["--max_faceless_attempts", str(self.max_faceless_attempts)])
 
         print("Launching server with:", " ".join(server_command))
         self.server_process = subprocess.Popen(server_command)
@@ -216,12 +235,12 @@ class GestureServerClient:
                     # Server closed the connection or fatal error
                     print("[INFO] Server closed connection or fatal recv_message error.")
                     break
-    
+
                 msg_type, data = result
                 if msg_type is None:
                     print("[INFO] Received msg_type None (connection closed by peer).")
                     break
-    
+
                 if msg_type == 0x02:
                     self._handle_json_response(data)
                 elif msg_type == 0x01:
@@ -251,7 +270,7 @@ class GestureServerClient:
                         print(f"Received combined (0x03) message but unhandled: {json_str}")
                 else:
                     print(f"[WARN] Received unknown message type {hex(msg_type)}")
-    
+
             except Exception as ex:
                 import traceback
                 print(f"[ERROR] Exception in _recv_loop: {ex}")
