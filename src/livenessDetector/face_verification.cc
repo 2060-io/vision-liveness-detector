@@ -1,4 +1,7 @@
 #include "face_verification.h"
+#include <opencv2/objdetect.hpp>
+#include <opencv2/imgproc.hpp>
+#include <vector>
 
 std::string verify_correct_face(
     const std::map<std::string, float>& face_square_normalized_points,
@@ -50,4 +53,35 @@ std::string verify_correct_face(
         return wrong_face_center_message;
     }
     return "";
+}
+
+// --- Haar cascade face detector  ---
+
+FaceCascadeDetector::FaceCascadeDetector(const std::string& cascade_path)
+    : loaded_(face_cascade_.load(cascade_path))
+{}
+
+bool FaceCascadeDetector::is_loaded() const {
+    return loaded_;
+}
+
+bool FaceCascadeDetector::detect(const cv::Mat& image, std::vector<cv::Rect>* faces) {
+    if (!loaded_ || image.empty())
+        return false;
+
+    cv::Mat gray;
+    if (image.channels() == 3)
+        cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+    else
+        gray = image.clone();
+
+    cv::equalizeHist(gray, gray);
+
+    std::vector<cv::Rect> found_faces;
+    face_cascade_.detectMultiScale(gray, found_faces, 1.1, 3, 0, cv::Size(40, 40));
+
+    if (faces) {
+        *faces = found_faces;
+    }
+    return !found_faces.empty();
 }

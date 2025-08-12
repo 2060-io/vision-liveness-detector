@@ -109,7 +109,7 @@ cc_library(
     deps = [
         "//third_party:opencv",
     ],
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
 )
 
 cc_library(
@@ -118,12 +118,10 @@ cc_library(
     hdrs = ["face_verification.h"],
     deps = [
         ":translation_manager",
+         "//third_party:opencv",
     ],
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
 )
-
-
-
 
 cc_test(
     name = "protocol_handler_test",
