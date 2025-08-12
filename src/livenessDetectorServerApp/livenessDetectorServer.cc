@@ -120,6 +120,14 @@ int main(int argc, char** argv) {
         gestures_list = split_paths(args["--gestures_list"]);
     }
 
+    // Path to cascade
+    const std::string cascade_path = "/path/to/haarcascade_frontalface_default.xml";
+    FaceCascadeDetector face_detector(cascade_path);
+    if (!face_detector.is_loaded()) {
+        std::cerr << "Failed to load Haar cascade from " << cascade_path << std::endl;
+        // No return EXIT_FAILURE for now
+    }
+
     std::unordered_map<std::string, std::string> gesture_name2path;
     for (const auto& folder : gestures_folders) {
         try {
@@ -261,16 +269,20 @@ int main(int argc, char** argv) {
 
     ProtocolHandler* handler_ptr = nullptr; // will point to actual handler
 
-    auto imageProcessingCallback = [&requester, &processor, &callback_data_json, &current_input_image, &warning_message, &handler_ptr](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
+    auto imageProcessingCallback = [&requester, &processor, &callback_data_json, &current_input_image, &warning_message, &handler_ptr, &face_detector](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
         current_input_image = inputImage.clone();
         processor.ProcessImage(inputImage);
+    
         std::unordered_map<std::string, double> npoints;
         cv::Mat processedImage = requester.process_image(inputImage, 0, npoints, warning_message);
         std::string callback_data = callback_data_json.empty() ? "" : callback_data_json.dump();
-
-        // --- (Safe place!) Send take picture combined message if needed ------
+    
+        // --- State for picture attempts ---
+        static int no_face_frame_count = 0;
+        static const int MAX_FACELESS_ATTEMPTS = 10;
+    
         if (callback_data_json.contains("takeAPicture") && callback_data_json["takeAPicture"] && handler_ptr != nullptr) {
-            if (!current_input_image.empty()) {
+            if (!current_input_image.empty() && face_detector.is_loaded()) {
                 cv::Mat img_to_send = current_input_image;
                 if (img_to_send.type() != CV_8UC3) {
                     std::cerr << "[CombinedMsg] Image not CV_8UC3 (was type " << img_to_send.type() << "), converting...\n";
@@ -279,20 +291,48 @@ int main(int argc, char** argv) {
                     }
                 }
                 if (!img_to_send.isContinuous()) img_to_send = img_to_send.clone();
+    
                 size_t expected_size = img_to_send.rows * img_to_send.cols * 3;
                 size_t actual_size = img_to_send.total() * img_to_send.elemSize();
+    
                 if (actual_size == expected_size) {
-                    std::string json_str = R"({"takeAPicture":true})";
-                    std::vector<std::pair<uint32_t, cv::Mat>> images = { {1, img_to_send} };
-                    handler_ptr->send_combined(images, json_str);
-                    std::cout << "[CombinedMsg] Sent take picture combined message.\n";
+                    std::vector<cv::Rect> faces;
+                    bool found = face_detector.detect(img_to_send, &faces);
+    
+                    if (found) {
+                        std::string json_str = R"({"takeAPicture":true})";
+                        std::vector<std::pair<uint32_t, cv::Mat>> images = { {1, img_to_send} };
+                        handler_ptr->send_combined(images, json_str);
+                        std::cout << "[CombinedMsg] Sent take picture combined message.\n";
+                        callback_data_json["takeAPicture"] = false;
+                        no_face_frame_count = 0;
+                    } else {
+                        ++no_face_frame_count;
+                        if (no_face_frame_count < MAX_FACELESS_ATTEMPTS) {
+                            // Prompt for another picture (flag stays true)
+                            callback_data_json["takeAPicture"] = true;
+                        } else {
+                            // Give up and show warning
+                            warning_message = "No face detected after multiple attempts.";
+                            callback_data_json["takeAPicture"] = false;
+                            no_face_frame_count = 0;
+                        }
+                    }
                 } else {
                     std::cerr << "[CombinedMsg] Image size mismatch! Not sending.\n";
+                    // Optionally: still increment counter for timout here if you want
                 }
             }
         }
-
-        callback_data_json.clear();
+    
+        // Temporarily save the value of takeAPicture, clear, then restore (if present)
+        if (callback_data_json.contains("takeAPicture")) {
+            auto takePic = callback_data_json["takeAPicture"];
+            callback_data_json.clear();
+            callback_data_json["takeAPicture"] = takePic;
+        } else {
+            callback_data_json.clear();
+        }
         return { processedImage, callback_data };
     };
 
