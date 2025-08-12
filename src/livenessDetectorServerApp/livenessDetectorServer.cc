@@ -75,6 +75,12 @@ int main(int argc, char** argv) {
         glasses_model_path = "glasses_model.onnx";
     }
 
+    // --face_det_model_path (optional)
+    std::string face_det_model_path = "";
+    if (args.find("--face_det_model_path") != args.end()) {
+        face_det_model_path = args["--face_det_model_path"];
+    }
+
     std::vector<std::string> required_keys = {
         "--model_path", "--gestures_folder_path", "--language", "--socket_path", "--num_gestures", "--font_path"
     };
@@ -97,6 +103,7 @@ int main(int argc, char** argv) {
             << " [--gestures_list <gesture1>:<gesture2>:...]"
             << " [--glasses_detector OFF|WARNING_ONLY|ERROR]"
             << " [--glasses_model_path <path_to_glasses_onnx>]"
+            << " [--face_det_model_path <path_to_face_cascade_xml>]" 
             << "\n";
         return EXIT_FAILURE;
     }
@@ -120,12 +127,17 @@ int main(int argc, char** argv) {
         gestures_list = split_paths(args["--gestures_list"]);
     }
 
-    // Path to cascade
-    const std::string cascade_path = "/path/to/haarcascade_frontalface_default.xml";
-    FaceCascadeDetector face_detector(cascade_path);
-    if (!face_detector.is_loaded()) {
-        std::cerr << "Failed to load Haar cascade from " << cascade_path << std::endl;
-        // No return EXIT_FAILURE for now
+    // ------------- FaceCascadeDetector creation logic --------------
+    std::unique_ptr<FaceCascadeDetector> face_detector;
+    if (!face_det_model_path.empty()) {
+        face_detector = std::make_unique<FaceCascadeDetector>(face_det_model_path);
+        if (!face_detector->is_loaded()) {
+            std::cerr << "Failed to load Haar cascade from " << face_det_model_path << std::endl;
+            face_detector = nullptr;
+            // No return EXIT_FAILURE for now
+        }
+    } else {
+        face_detector = nullptr;
     }
 
     std::unordered_map<std::string, std::string> gesture_name2path;
@@ -269,7 +281,9 @@ int main(int argc, char** argv) {
 
     ProtocolHandler* handler_ptr = nullptr; // will point to actual handler
 
-    auto imageProcessingCallback = [&requester, &processor, &callback_data_json, &current_input_image, &warning_message, &handler_ptr, &face_detector](const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string> {
+    auto imageProcessingCallback = [&requester, &processor, &callback_data_json, &current_input_image, &warning_message, &handler_ptr, &face_detector]
+    (const cv::Mat& inputImage) -> std::pair<cv::Mat, std::string>
+    {
         current_input_image = inputImage.clone();
         processor.ProcessImage(inputImage);
     
@@ -282,7 +296,8 @@ int main(int argc, char** argv) {
         static const int MAX_FACELESS_ATTEMPTS = 10;
     
         if (callback_data_json.contains("takeAPicture") && callback_data_json["takeAPicture"] && handler_ptr != nullptr) {
-            if (!current_input_image.empty() && face_detector.is_loaded()) {
+            // GUARD: check that face_detector exists AND is loaded
+            if (!current_input_image.empty() && face_detector && face_detector->is_loaded()) {
                 cv::Mat img_to_send = current_input_image;
                 if (img_to_send.type() != CV_8UC3) {
                     std::cerr << "[CombinedMsg] Image not CV_8UC3 (was type " << img_to_send.type() << "), converting...\n";
@@ -297,7 +312,7 @@ int main(int argc, char** argv) {
     
                 if (actual_size == expected_size) {
                     std::vector<cv::Rect> faces;
-                    bool found = face_detector.detect(img_to_send, &faces);
+                    bool found = face_detector->detect(img_to_send, &faces);
     
                     if (found) {
                         std::string json_str = R"({"takeAPicture":true})";
