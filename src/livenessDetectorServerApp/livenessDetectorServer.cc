@@ -214,6 +214,9 @@ int main(int argc, char** argv) {
         std::cerr << "No gesture JSON files found in the specified folder(s). Exiting application.\n";
         return EXIT_FAILURE;
     }
+    // =========================
+    // GESTURE LOADING LOGIC END
+    // =========================
 
     GestureDetector detector;
     std::vector<GestureDetector::AddResult> loadedGestures;
