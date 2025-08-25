@@ -36,7 +36,8 @@ def main():
         language="en",
         socket_path="/tmp/mysocket",
         num_gestures=2,
-        gestures_list=["blink", "smile", "openCloseMouth"]
+        gestures_list=["blink", "smile", "openCloseMouth"],
+        max_faceless_attempts=17
     )
 
     # Set the callback functions

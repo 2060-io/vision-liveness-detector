@@ -183,6 +183,9 @@ Your Python App
 - Custom gestures/locales are picked up as configured.
 - Responses, instructions, overlays, and result events all flow through the Python API.
 
+
+Liveness Detector Server implements [General Purpose Message Framing Protocol](./docs/general-purpose-message-framing-protocol.md) over Unix Socket IPC for an efficient and flexible communication with the Python layer.
+
 ---
 
 ## Features
