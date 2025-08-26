@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/2060-io/vision-liveness-detector/compare/v0.6.0...v0.7.0) (2025-08-25)
+
+
+### Features
+
+* Unix Socket IPC through General Purpose Framing Message Protocol ([#21](https://github.com/2060-io/vision-liveness-detector/issues/21)) ([3a4c7bd](https://github.com/2060-io/vision-liveness-detector/commit/3a4c7bdace62910278900852d1b6fb29cbf3e1f8))
+
 ## [0.6.0](https://github.com/2060-io/vision-liveness-detector/compare/v0.5.0...v0.6.0) (2025-08-08)
 
 
